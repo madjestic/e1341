@@ -1,0 +1,274 @@
+cabal-version:      3.6
+name:               e1341
+version:            0.1.0.0
+synopsis:      A space sim game.
+description:   Please see the README on GitHub at <https://github.com/madjestic/e1338#readme>
+homepage:      https://github.com/madjestic/e1341
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        madjestic
+maintainer:    madjestic13@gmail.com
+copyright:     Vladimir Lopatin
+category:      App
+build-type:    Simple
+               
+extra-source-files:
+    CHANGELOG.md
+    README.md
+    LICENSE
+
+source-repository head
+  type:         git
+  location:     https://github.com/madjestic/e1341
+
+library 
+  exposed-modules:
+      Load_glTF
+      Model_glTF 
+      --Scene_glTF 
+  other-modules:
+      --Paths_keid_resource_gltf
+  hs-source-dirs:
+      src
+  default-extensions:
+      NoImplicitPrelude
+      ApplicativeDo
+      BangPatterns
+      BinaryLiterals
+      BlockArguments
+      ConstrainedClassMethods
+      ConstraintKinds
+      DataKinds
+      DefaultSignatures
+      DeriveDataTypeable
+      DeriveFunctor
+      DeriveGeneric
+      DeriveLift
+      DeriveTraversable
+      DerivingStrategies
+      DerivingVia
+      DuplicateRecordFields
+      EmptyCase
+      EmptyDataDeriving
+      ExistentialQuantification
+      ExplicitForAll
+      FlexibleContexts
+      FlexibleInstances
+      FunctionalDependencies
+      GADTs
+      GeneralizedNewtypeDeriving
+      HexFloatLiterals
+      ImportQualifiedPost
+      InstanceSigs
+      KindSignatures
+      LambdaCase
+      LiberalTypeSynonyms
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NamedWildCards
+      NumDecimals
+      NumericUnderscores
+      OverloadedStrings
+      PatternSynonyms
+      PostfixOperators
+      QuantifiedConstraints
+      QuasiQuotes
+      RankNTypes
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      StandaloneKindSignatures
+      StrictData
+      TemplateHaskell
+      TupleSections
+      TypeApplications
+      TypeFamilies
+      TypeOperators
+      TypeSynonymInstances
+      UnicodeSyntax
+      ViewPatterns
+  --ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  ghc-options: -O2
+  --ghc-options:     -fprof-auto -fprof-cafs 
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , containers
+    , geomancy >=0.2.6.0
+    , gl-block
+    , gltf-codec
+    , keid-core
+    , rio >=0.1.12.0
+    , vector
+  default-language: Haskell2010
+
+-- library RedViz
+--   hs-source-dirs:
+--                 src
+--   --ghc-options: -O2 -Wall -Werror -Wcompat -Widentities -Wno-unused-top-binds -Wno-orphans
+--   --ghc-options: -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
+--   ghc-options:     -fprof-auto -fprof-cafs 
+--   --ghc-options: -threaded -O2
+--   build-depends:
+--                 base
+--               , aeson               
+--               , aeson-pretty
+--               --, bearriver
+--               , Yampa              
+--               , bytestring
+--               , containers
+--               , directory
+--               --, GLUtil              
+--               , ilist               
+--               , lens                
+--               , linear              
+--               , locators            
+--               , massiv          
+--               , OpenGL
+--               , random              
+--               , scientific          
+--               , simple-affine-space 
+--               , sdl2                
+--               , sort
+--               , split
+--               , store
+--               , text                
+--               , uuid                
+--               , vector
+--               , array
+--               , JuicyPixels
+              
+--   exposed-modules:
+--               Graphics.RedViz.LoadShaders
+--               Graphics.RedViz.Rendering
+--               Graphics.RedViz.Material
+--               Graphics.RedViz.Material.Lens
+--               Graphics.RedViz.Descriptor
+--               Graphics.RedViz.Drawable
+--               Graphics.RedViz.Drawable.Lens
+--               Graphics.RedViz.Texture
+--               Graphics.RedViz.Texture.Lens
+--               Graphics.RedViz.Utils
+--               Graphics.RedViz.Camera
+--               Graphics.RedViz.Camera.Lens
+--               Graphics.RedViz.Controllable
+--               Graphics.RedViz.Input
+--               Graphics.RedViz.Input.Keyboard
+--               Graphics.RedViz.Input.Mouse
+--               Graphics.RedViz.Input.FRP.Yampa.Update.Mouse
+--               Graphics.RedViz.Backend
+--               Graphics.RedViz.Input.FRP.Yampa
+--               Graphics.RedViz.Input.FRP.Yampa.AppInput
+--               Graphics.RedViz.Project
+--               Graphics.RedViz.Project.Model
+--               Graphics.RedViz.Project.Utils
+--               Graphics.RedViz.PGeo
+--               Graphics.RedViz.VAO
+--               Graphics.RedViz.FromVector
+--               Graphics.RedViz.Object
+--               Graphics.RedViz.Object.Lens
+--               Graphics.RedViz.Widget
+--               Graphics.RedViz.GLUtil
+--               Graphics.RedViz.GLUtil.JuicyTextures
+--               Graphics.RedViz.GLUtil.Textures
+--               Graphics.RedViz.GLUtil.TypeMapping
+              
+--   other-modules:
+--                 Paths_e1341
+--                 Graphics.RedViz
+              
+--   default-language:
+--               Haskell2010
+
+executable ProjectViewer
+    main-is:          ProjectViewer.hs
+    --ghc-options:   -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-unused-top-binds -Wno-orphans    
+    --ghc-options:   -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
+    ghc-options:     -threaded -O2
+    build-depends:    base ^>=4.16.4.0
+                    , aeson
+                    , aeson-pretty
+                    , array
+                    , bytestring
+                    , containers
+                    , dunai
+                    , directory
+                    , geomancy
+                    , gl-block
+                    , gltf-codec
+                    , gltf-loader
+                    , ilist
+                    , JuicyPixels
+                    , keid-resource-gltf
+                    , keid-core ==0.1.8.0
+                    , lens
+                    , linear
+                    , locators
+                    , massiv
+                    , OpenGL
+                    , sdl2
+                    , simple-affine-space
+                    , sort
+                    , text
+                    , transformers
+                    , microlens
+                    , random
+                    , rio
+                    , split
+                    , StateVar
+                    , vector
+                    , uuid
+                    
+    other-modules:
+                    LoadShaders
+                  , Load_glTF
+                  , Model_glTF
+                  , Projects.Test                  
+                  , Graphics.RedViz.Material
+                  , Graphics.RedViz.Texture
+                  , Graphics.RedViz.Utils
+                  , Graphics.RedViz.Backend
+                  , Graphics.RedViz.Camera
+                  , Graphics.RedViz.Controllable
+                  , Graphics.RedViz.Descriptor
+                  , Graphics.RedViz.Drawable
+                  , Graphics.RedViz.Input.Keyboard
+                  , Graphics.RedViz.Input.Mouse
+                  , Graphics.RedViz.Object
+                  , Graphics.RedViz.Camera
+                  , Graphics.RedViz.GLUtil
+                  , Graphics.RedViz.GLUtil.JuicyTextures
+                  , Graphics.RedViz.GLUtil.Textures
+                  , Graphics.RedViz.GLUtil.TypeMapping
+                  , Graphics.RedViz.LoadShaders
+                  , Graphics.RedViz.Camera.Lens
+                  , Graphics.RedViz.Drawable.Lens
+                  , Graphics.RedViz.Material.Lens
+                  , Graphics.RedViz.Object.Lens
+                  , Graphics.RedViz.Rendering
+                  , Graphics.RedViz.Texture.Lens
+                  , Graphics.RedViz.VAO
+                  , Graphics.RedViz.Widget
+                  , Graphics.RedViz.Project
+                  , Graphics.RedViz.Project.Model
+                  
+    hs-source-dirs:
+                    app
+                  , src
+    default-extensions:
+                    ImportQualifiedPost
+                    BlockArguments
+                    LambdaCase
+                    NamedFieldPuns
+                    OverloadedStrings
+                    RankNTypes
+                    RecordWildCards
+                    ScopedTypeVariables
+                    TupleSections
+                    TypeApplications
+                    DerivingStrategies
+                    DerivingVia
+                    DeriveGeneric
+                                                              
+    default-language:
+                    Haskell2010
