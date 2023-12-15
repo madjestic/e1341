@@ -599,7 +599,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                       }
                      
                     updateSolver :: Object -> Solver -> Solver
-                    updateSolver obj slv =
+                    updateSolver _ slv =
                       case slv of
                         Identity               -> slv
                         Translate _ pos vel    -> slv { txyz   = pos  + vel }
@@ -610,7 +610,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                     solve obj slv =
                       case slv of
                         Identity -> obj { xform = identity }
-                        Translate cs pos vel ->
+                        Translate cs pos _ ->
                           case cs of
                             WorldSpace  ->
                               obj
@@ -619,7 +619,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                               }
                             ObjectSpace -> undefined
 
-                        Rotate cs pos rord rxyz avel ->
+                        Rotate _ _ rord rxyz _ ->
                           obj
                           { xform = transform identity
                           , slvrs = [updateSolver obj slv]
@@ -656,9 +656,6 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                 ivec            = normalize $ centroid - camera_position :: V3 Double
                                 s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
-          --updateGUI :: StateT Game IO ()
-          --updateGUI = undefined
-
           handleEvents :: StateT Game IO Bool
           handleEvents = do
             events <- SDL.pollEvents
@@ -691,30 +688,30 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                         Nothing     -> return ()
                         Just (_, k) -> case lookup k mapping of
                                           Nothing -> return ()
-                                          Just k  -> k
+                                          Just k'  -> k'
                 
                 mapKeyEvents :: [(Scancode, StateT Game IO ())]
                 mapKeyEvents =
                   [ (ScancodeW, inc   10)
                   , (ScancodeS, inc (-10))
-                  , (ScancodeEscape, quit True)
+                  , (ScancodeEscape, quitE True)
                   , (ScancodeQ, camRoll   1)
                   , (ScancodeE, camRoll (-1))
                   ]
                   where
                     camRoll :: Integer -> StateT Game IO ()
-                    camRoll n = modify $ camRoll' n
+                    camRoll n = modify $ camRoll'
                       where
-                        camRoll' :: Integer -> Game -> Game
-                        camRoll' k g0 = g0 { camera = updateCam n cam0 }
+                        camRoll' :: Game -> Game
+                        camRoll' g0 = g0 { camera = updateCam cam0 }
                           where
                             cam0            = camera g0
-                            updateCam :: Integer -> Camera -> Camera
-                            updateCam n cam =
-                              cam { controller = updateController n (controller cam)}
+                            updateCam :: Camera -> Camera
+                            updateCam cam =
+                              cam { controller = updateController (controller cam)}
                               where
-                                updateController :: Integer -> Controllable -> Controllable
-                                updateController pos ctrl@(Controller _ mtx0 _ ypr0 _) =
+                                updateController :: Controllable -> Controllable
+                                updateController ctrl@(Controller _ mtx0 _ _ _) =
                                   ctrl
                                   { transform = 
                                       mkTransformationMat
@@ -731,17 +728,17 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                     inc n = modify $ inc' n
                       where
                         inc' :: Integer -> Game -> Game
-                        inc' k g0 = g0 { uniforms = incUnis (fromIntegral(tick g0 + k)) (uniforms g0) }
+                        inc' k g0 = g0 { uniforms = incUnis (tick g0 + k) (uniforms g0) }
                           where
                             incUnis :: Integer -> Uniforms -> Uniforms
                             incUnis tick' unis0 = 
                               unis0 { u_time = fromInteger tick' }
                      
-                    quit :: Bool -> StateT Game IO ()
-                    quit b = modify $ quit' b
+                    quitE :: Bool -> StateT Game IO ()
+                    quitE b' = modify $ quit' b'
                       where
                         quit' :: Bool -> Game -> Game
-                        quit' b gameLoopDelay = gameLoopDelay { quitGame = b }
+                        quit' b'' gameLoopDelay' = gameLoopDelay' { quitGame = b'' }
 
                 updateMouse  :: [Event] -> StateT Game IO ()
                 updateMouse = mapM_ processEvent 
@@ -780,7 +777,6 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                               (mtx0^._m33)
                                               !*! fromQuaternion (axisAngle (mtx0^.(_m33._x)) (mouseS cam^._x * (fromIntegral $ pos^._y))) -- pitch
                                               !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (mouseS cam^._x * (fromIntegral $ pos^._x))) -- yaw
-
          
   
 -- < Rendering > ----------------------------------------------------------
