@@ -764,7 +764,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                       cam { controller = updateController pos (controller cam)}
                                       where
                                         updateController :: Point V2 CInt -> Controllable -> Controllable
-                                        updateController pos ctrl@(Controller _ mtx0 _ ypr0 _) =
+                                        updateController _ ctrl@(Controller _ mtx0 _ _ _) =
                                           ctrl
                                           { transform = 
                                               mkTransformationMat
@@ -797,7 +797,7 @@ openWindow title (sizex,sizey) = do
                        }
      
     window <- SDL.createWindow
-            "MFS / SDL / OpenGL Example"
+              title
               SDL.defaultWindow
               { SDL.windowInitialSize     = V2 sizex sizey
               , SDL.windowGraphicsContext = OpenGLContext config }
@@ -831,7 +831,7 @@ toDescriptorMat file = do
   (stuff, mats) <- loadGltf file -- "models/pighead.gltf"
   mats' <- mapM fromGltfMaterial mats
   print mats'
-  ds    <- mapM (\((vs, idx), mat) -> initResources idx vs mat 0) $ zip (concat stuff) mats'
+  ds    <- mapM (\((vs, idx), mat) -> initResources idx vs mat) $ zip (concat stuff) mats'
   return $ zip ds mats'
     where
       fromGltfMaterial :: Gltf.Material -> IO R.Material
@@ -844,8 +844,8 @@ toDescriptorMat file = do
 fromVertex3 :: Vertex3 Double -> [GLfloat]
 fromVertex3 (Vertex3 x y z) = [double2Float x, double2Float y, double2Float z]
 
-initResources :: [GLfloat] -> [GLenum] -> R.Material -> Double -> IO Descriptor
-initResources vs idx mat z0 =  
+initResources :: [GLfloat] -> [GLenum] -> R.Material -> IO Descriptor
+initResources vs idx mat =  
   do
     -- print $ mat
     -- | VAO
@@ -914,9 +914,6 @@ renderOutput :: Window -> GameSettings -> (Game, Maybe Bool) -> IO Bool
 renderOutput _ _ ( _,Nothing) = quit >> return True
 renderOutput window gs (g,_) = do
   let
-    timer = 0.01 * (fromIntegral $ tick g)
-    --ds'   = descriptor <$> drs g :: [Descriptor]
-
   clearColor $= Color4 0.0 0.0 0.0 1.0
   GL.clear [ColorBuffer, DepthBuffer]
 
@@ -945,7 +942,7 @@ renderWidget cam unis' wgt = case wgt of
     where
       idrs = concatMap drws (icons wgt)
   TextField False _ _ _ _   -> do return ()
-  TextField _ s fnts fmt opts -> -- TODO: add String rendering
+  TextField _ s _ fmt _ -> -- TODO: add String rendering
     mapM_
     (\dr -> do
         bindUniforms cam unis' dr 
@@ -953,7 +950,7 @@ renderWidget cam unis' wgt = case wgt of
         bindVertexArrayObject $= Just triangles
         drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
         ) $ formatText fmt wdrs s (0,0)
-  Selector active' icons' objs' -> 
+  Selector _ icons' objs' -> 
     mapM_
     (\obj -> do
         mapM_
