@@ -228,7 +228,7 @@ data Drawable
      , dtxs       :: [(Int, (Texture, TextureObject))]
      , doptions   :: BackendOptions
      , u_xform    :: M44 Double
-     } deriving Show
+     } deriving Show  
 
 data Uniforms
   =  Uniforms
