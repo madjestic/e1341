@@ -758,10 +758,10 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                               modify $ mmove' pos
                               where
                                 mmove' :: Point V2 CInt -> Game -> Game
-                                mmove' pos g0 = g0 { camera = updateCam pos (camera g0) }
+                                mmove' pos' g0 = g0 { camera = updateCam pos' (camera g0) }
                                   where
-                                    updateCam pos cam =
-                                      cam { controller = updateController pos (controller cam)}
+                                    updateCam pos'' cam =
+                                      cam { controller = updateController pos'' (controller cam)}
                                       where
                                         updateController :: Point V2 CInt -> Controllable -> Controllable
                                         updateController _ ctrl@(Controller _ mtx0 _ _ _) =
@@ -912,6 +912,7 @@ bufferOffset = plusPtr nullPtr . fromIntegral
   
 renderOutput :: Window -> GameSettings -> (Game, Maybe Bool) -> IO Bool
 renderOutput _ _ ( _,Nothing) = quit >> return True
+
 renderOutput window gs (g,_) = do
   let
   clearColor $= Color4 0.0 0.0 0.0 1.0
@@ -966,19 +967,19 @@ renderWidget cam unis' wgt = case wgt of
 type CursorPos = (Integer, Integer)
 
 formatText :: Format -> [Drawable] -> [String] -> CursorPos -> [Drawable]
-formatText fmt drws [] _  = []
+formatText _ _ [] _  = []
 formatText fmt drws [s] (x,y) =
   formatString fmt drws s (x,y)
 formatText fmt drws (s:ss) (x,y) =
   formatText fmt drws [s] (x,y) ++ formatText fmt drws ss (x,y+1)
 
 formatString :: Format -> [Drawable] -> String -> CursorPos -> [Drawable]
-formatString fmt drws []     (x,y) = []
+formatString _ _ [] _ = []
 formatString fmt drws [c]    (x,y) = [formatChar fmt drws c (x,y)]
 formatString fmt drws (c:cs) (x,y) =  formatChar fmt drws c (x,y) : formatString fmt drws cs (x+1,y)
 
 formatChar :: Format -> [Drawable] -> Char -> CursorPos -> Drawable
-formatChar fmt drws chr cpos =
+formatChar _ drws chr cpos =
   case chr of
     ' ' -> offsetDrw cpos (drws!!0)
     '0' -> offsetDrw cpos (drws!!1)
@@ -1191,7 +1192,7 @@ bindUniforms cam' unis' dr =
 
     -- | Allocate Textures
     texture Texture2D        $= Enabled
-    mapM_ (allocateTextures u_prog') (dtxs dr) -- TODO: this is ignored, should bind an appropriate texture
+    mapM_ allocateTextures (dtxs dr) -- TODO: this is ignored, should bind an appropriate texture
 
     -- | Unload buffers
     bindVertexArrayObject         $= Nothing
@@ -1199,8 +1200,8 @@ bindUniforms cam' unis' dr =
       where        
         toList' = fmap realToFrac.concat.(fmap DF.toList.DF.toList) :: V4 (V4 Double) -> [GLfloat]
           
-allocateTextures :: Program -> (Int, (Texture, TextureObject)) -> IO ()
-allocateTextures program0 (txid, (tx, txo)) =
+allocateTextures :: (Int, (Texture, TextureObject)) -> IO ()
+allocateTextures (txid, (tx, txo)) =
   do
     activeTexture $= TextureUnit (fromIntegral txid)
     textureBinding Texture2D $= Just txo
