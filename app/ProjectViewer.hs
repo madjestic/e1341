@@ -3,47 +3,35 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Main where
 
-import           SDL hiding (Texture, normalize)
---import           Control.Concurrent
-import           Control.Monad (when)
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.MSF as TMSF
-import           Data.MonadicStreamFunction  
---import qualified Data.MonadicStreamFunction as MSF
-import           Data.Text (Text, unpack) 
---import           Control.Monad.Trans.MSF.Maybe (exit)
---import           Control.Monad.Trans.MSF.Except
+import SDL hiding (Texture, normalize)
+import Control.Monad (when)
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.MSF as TMSF
+import Data.MonadicStreamFunction  
+import Data.Text (Text, unpack) 
 import Foreign (sizeOf)
-import           Foreign.C.Types  
-import           Unsafe.Coerce
-import           Graphics.Rendering.OpenGL as GL hiding (Select, normalize)
-import           Foreign.Ptr (plusPtr, nullPtr, Ptr)
-import           Foreign.Marshal.Array (withArray)  
---import           Codec.GlTF as GlTF
---import           Codec.GlTF.Mesh as Mesh
-import           Text.GLTF.Loader as Gltf hiding (Texture, Material)
-import           Codec.GlTF.Material as Gltf
-import           Lens.Micro
-import           Control.Lens.Combinators (view)
-import qualified Data.Vector as V hiding (head, length)
-import           Data.Foldable as DF
-import           Data.Word
-import           GHC.Float
---import           Graphics.Rendering.OpenGL (VertexArrayObject, NumArrayIndices, DataType (Double), TextureObject (TextureObject))
-import           Data.StateVar as SV
---import           Codec.GlTF.Mesh (Mesh(..))
+import Foreign.C.Types  
+import Unsafe.Coerce
+import Graphics.Rendering.OpenGL as GL hiding (Select, normalize)
+import Foreign.Ptr (plusPtr, nullPtr, Ptr)
+import Foreign.Marshal.Array (withArray)  
+import Text.GLTF.Loader as Gltf hiding (Texture, Material)
+import Codec.GlTF.Material as Gltf
+import Lens.Micro
+import Control.Lens.Combinators (view)
+import Data.Vector qualified as V hiding (head, length)
+import Data.Foldable as DF
+import Data.Word
+import GHC.Float
+import Data.StateVar as SV
 import Geomancy.Vec4 hiding (dot, normalize) 
 import Geomancy.Vec3 hiding (dot, normalize)
 import Geomancy.Vec2 hiding (dot, normalize)
---import RIO.Vector qualified as Vector
---import Codec.GlTF.Buffer qualified as Buffer
---import RIO.ByteString qualified as ByteString
 import Data.Coerce (coerce)
 import Data.UUID
 import Linear.Projection         as LP        (infinitePerspective)
---import Linear.Matrix
 import Linear.Metric (normalize)
 import Data.Maybe (fromMaybe)
 import Data.Set as DS ( fromList, toList )
@@ -53,19 +41,14 @@ import Load_glTF (loadMeshPrimitives)
 import Model_glTF
 -- import Projects.Test
 
---import Graphics.RedViz.Project as P
 import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Descriptor
 import Graphics.RedViz.Backend
 import Graphics.RedViz.LoadShaders
---import Graphics.RedViz.GLUtil.JuicyTextures
---import Graphics.RedViz.GLUtil                 (readTexture, texture2DWrap)
 import Graphics.RedViz.Rendering (bindTexture')
 import Graphics.RedViz.Material as R
 
 --import Debug.Trace as DT
-
---import RIO (throwString)
 
 type DTime = Double
 
@@ -160,7 +143,6 @@ instance Show PType where
 data PreObject
   =  PreObject
      { pname          :: String
-     --, ptype          :: String
      , ptype          :: PType
      , pidx           :: Integer
      , uuid           :: UUID
@@ -188,12 +170,6 @@ initObj =
   , slvrs    = []
   , selected = False
   }
-
--- toObjects     :: Project -> [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> IO [Object]
--- toObjects     prj txTuples dms = mapM (toObject prj txTuples dms) (preObjects prj)
-
--- toFontObjects :: Project -> [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> IO [Object]
--- toFontObjects prj txTuples dms = mapM (toObject prj txTuples dms) (preFontObject prj)
 
 testM44 :: M44 Double  
 testM44 =
@@ -374,8 +350,8 @@ initProject resx' resy' =
     ]
   , iconModels =
     [
-      "models/brackets.gltf"
-    , "models/fnt_crosshair.gltf"
+      "models/fnt_crosshair.gltf"
+    , "models/brackets.gltf"
     ]
     , preObjects = 
     [ PreObject
@@ -431,11 +407,23 @@ initProject resx' resy' =
   , preIconObject =
     [ PreObject
       {
-        pname          = "icons"
+        pname          = "crosshair"
       , ptype          = Icon
       , pidx           = 0
       , uuid           = nil
-      , modelIDXs      = [0,1]
+      , modelIDXs      = [0]
+      , presolvers     = []
+      , presolverAttrs = []
+      , solvers        = [ Identity ]
+      , options        = defaultBackendOptions
+      }
+    , PreObject
+      {
+        pname          = "brackets"
+      , ptype          = Icon
+      , pidx           = 1
+      , uuid           = nil
+      , modelIDXs      = [1]
       , presolvers     = []
       , presolverAttrs = []
       , solvers        = [ Identity ]
@@ -480,9 +468,9 @@ data Widget
      , optionsW :: BackendOptions
      }
   |  Selector
-     { active :: Bool
-     , icons  :: [Object]
-     , object :: [Object]
+     { active  :: Bool
+     , icons   :: [Object]
+     , objects :: [Object]
      }
   deriving (Generic, Show)
 
@@ -581,7 +569,8 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                     widgetSolver :: Widget -> Widget
                     widgetSolver wgt =
                       case wgt of
-                        Selector {} -> error "Selector undefined" -- TODO: implement selector
+                        Selector {} ->
+                          wgt { objects = filter selected $ objs g0 }
                         _ -> wgt
                         -- add square generation via geo shader per selected object
 
@@ -594,7 +583,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
               where
                 debug :: Game -> IO ()
                 debug g0 = do
-                  let result = selected . head $ objs g0
+                  let result = map selected $ objs g0
                   print $ "debug : " ++ show result
                 
                 solveObjs :: Game -> Game
@@ -847,7 +836,7 @@ toDescriptorMat :: FilePath -> IO [(Descriptor, R.Material)]
 toDescriptorMat file = do
   (stuff, mats) <- loadGltf file -- "models/pighead.gltf"
   mats' <- mapM fromGltfMaterial mats
-  print mats'
+  --print mats'
   ds    <- mapM (\((vs, idx), mat) -> initResources idx vs mat) $ zip (concat stuff) mats'
   return $ zip ds mats'
     where
@@ -940,6 +929,7 @@ renderOutput window _ (g,_) = do
   depthFunc $= Just Less
   cullFace  $= Just Back
 
+  --print $ wgts g
   mapM_ (renderObject (camera g) (uniforms g)) (objs g)
   mapM_ (renderWidget (camera g) (uniforms g)) (wgts g)
 
@@ -951,7 +941,6 @@ renderWidget cam unis' wgt = case wgt of
   Cursor  False _ _ _     -> do return ()
   Cursor  {} ->
     (\dr -> do
-        print $ length (icons wgt)
         bindUniforms cam unis' (formatDrw (format wgt) dr) 
         let (Descriptor triangles numIndices _) = descriptor dr
         bindVertexArrayObject $= Just triangles
@@ -960,15 +949,26 @@ renderWidget cam unis' wgt = case wgt of
     where
       idrs = concatMap drws (icons wgt)
   TextField False _ _ _ _   -> do return ()
-  TextField _ s _ fmt _ -> -- TODO: add String rendering
+  TextField _ s _ fmt _ -> do
     mapM_
-    (\dr -> do
+      (\dr -> do
         bindUniforms cam unis' dr 
         let (Descriptor triangles numIndices _) = descriptor dr
         bindVertexArrayObject $= Just triangles
         drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
-        ) $ formatText fmt wdrs s (0,0)
-  _ -> error "Unknown Widget type" -- TODO: implement selector
+      ) $ formatText fmt wdrs s (0,0)
+  Selector active' icons' objs' -> -- TODO: why icons' is not 2?
+    mapM_ (\obj ->
+             do
+               print $ "SUKANAH!"
+               mapM_
+                 (\dr -> do
+                     bindUniforms cam unis' dr {u_xform = xform obj} 
+                     let (Descriptor triangles numIndices _) = descriptor dr
+                     bindVertexArrayObject $= Just triangles
+                     drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
+                 ) (drws (icons'!!1))) objs'
+  -- _ -> error "Unknown Widget type" -- TODO: implement selector
   where
     wdrs = concatMap drws (fonts wgt)
 
@@ -1334,11 +1334,11 @@ main = do
             }
           , optionsW = defaultBackendOptions
           }
-        , Selector
-        { active = True
-        , icons  = iobjs'
-        , object = []
-        }
+        , Selector -- TODO: Why is there w render glitch?
+          { active  = True
+          , icons   = iobjs'
+          , objects = []
+          }
         ]
       }
     runGame
