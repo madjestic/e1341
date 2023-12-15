@@ -10,8 +10,8 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.MSF as TMSF
 import Data.MonadicStreamFunction  
-import Data.Text (Text, unpack) 
-import Foreign (sizeOf)
+import Data.Text (Text, unpack)
+import Foreign (sizeOf)  
 import Foreign.C.Types  
 import Unsafe.Coerce
 import Graphics.Rendering.OpenGL as GL hiding (Select, normalize)
@@ -39,13 +39,12 @@ import GHC.Generics
 
 import Load_glTF (loadMeshPrimitives)
 import Model_glTF
--- import Projects.Test
 
 import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Descriptor
 import Graphics.RedViz.Backend
 import Graphics.RedViz.LoadShaders
-import Graphics.RedViz.Rendering (bindTexture')
+import Graphics.RedViz.Rendering (bindTexture')  
 import Graphics.RedViz.Material as R
 
 --import Debug.Trace as DT
@@ -129,7 +128,6 @@ data RotationOrder =
 
 instance Show RotationOrder where
   show XYZ = "XYZ"
-  -- show _   = error "RotationOrder undefined"
 
 data PType = Default
            | Font
@@ -151,8 +149,7 @@ data PreObject
      , presolverAttrs :: [[Double]]
      , solvers        :: [Solver]
      , options        :: BackendOptions
-     }
-  deriving Show
+     } deriving Show
 
 data Object
   =  Object
@@ -171,6 +168,15 @@ initObj =
   , selected = False
   }
 
+toObjects :: Project -> [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> IO [Object]
+toObjects  prj txTuples dms = mapM (toObject txTuples dms) (preObjects prj)
+
+toObjects' :: [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> [PreObject] -> IO [Object]
+toObjects' txTuples dms = mapM (toObject txTuples dms)
+
+toFontObjects :: Project -> [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> IO [Object]
+toFontObjects prj txTuples dms = mapM (toObject txTuples dms) (preFontObject prj)
+
 testM44 :: M44 Double  
 testM44 =
   (V4
@@ -181,10 +187,6 @@ testM44 =
   
 toObject :: [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> PreObject -> IO Object
 toObject txTuples' dms' pobj = do
-  -- putStrLn "DEBUG toObject :"
-  -- putStrLn $ "length dms ' :" ++ show (length dms')
-  -- putStrLn $ "dms '        :" ++ show dms'
-  -- putStrLn $ "pobj         :" ++ show pobj
   let
     dms      = (dms'!!) <$> modelIDXs pobj
     txs      = concatMap (\(_,m) -> R.textures m) $ concat dms :: [Texture]
@@ -192,11 +194,23 @@ toObject txTuples' dms' pobj = do
     txos     = snd <$> txTuples :: [TextureObject]
     drs =
       toDrawable
-      (identity :: M44 Double)
+      ""
+      0.0
+      (1200, 720)
+      (camera initGame)
+      (identity :: M44 Double) -- TODO: add result based on solvers composition
       defaultBackendOptions
-      txos
+      txTuples
       <$> concat dms
       :: [Drawable]
+    
+    -- drs =
+    --   toDrawable
+    --   (identity :: M44 Double)
+    --   defaultBackendOptions
+    --   txos
+    --   <$> concat dms
+    --   :: [Drawable]
 
     obj =
       Object
@@ -211,7 +225,7 @@ data Drawable
   =  Drawable
      { descriptor :: Descriptor
      , material   :: R.Material
-     , dtxs       :: [(Int, TextureObject)]
+     , dtxs       :: [(Int, (Texture, TextureObject))]
      , doptions   :: BackendOptions
      , u_xform    :: M44 Double
      } deriving Show
@@ -251,10 +265,10 @@ data Project
      , camMode        :: String
      , models         :: [FilePath]
      , fontModels     :: [FilePath]
-     , iconModels     :: [FilePath]
+     , iconModels     :: [FilePath]     
      , preObjects     :: [PreObject]
      , preFontObject  :: [PreObject]
-     , preIconObject  :: [PreObject]
+     , preIconObject  :: [PreObject]     
      , cameras        :: [Camera]
      } deriving Show
 
@@ -353,7 +367,7 @@ initProject resx' resy' =
       "models/fnt_crosshair.gltf"
     , "models/brackets.gltf"
     ]
-    , preObjects = 
+  , preObjects = 
     [ PreObject
       {
         pname          = "test_object"
@@ -365,16 +379,16 @@ initProject resx' resy' =
       , presolverAttrs = []
       , solvers        =
         [ Identity
-        -- , Rotates
+        -- , Rotate
         --   { space = ObjectSpace
         --   , cxyz  = V3 0 0 0
         --   , rord  = XYZ
         --   , rxyz  = V3 0 0 (0.5)
         --   , avel  = V3 0 0 0.01 }
-        -- , Translate
-        --   { space = WorldSpace
-        --   , txyz  = V3 1.1 0 0
-        --   , tvel  = V3 0.0 0 0 }
+        , Translate
+          { space = WorldSpace
+          , txyz  = V3 1.1 0 0
+          , tvel  = V3 0.0 0 0 }
         -- , Rotate
         --   { space = ObjectSpace
         --   , cxyz  = V3 0 0 0
@@ -400,7 +414,8 @@ initProject resx' resy' =
       , modelIDXs      = [0..75]
       , presolvers     = []
       , presolverAttrs = []
-      , solvers        = [ Identity ]
+      , solvers        = [ Identity
+                         ]
       , options        = defaultBackendOptions
       }
     ]
@@ -515,14 +530,22 @@ unzipWith xs xys = xys'
     xys' = filter (\xy -> fst xy `elem` xs) xys
 
 toDrawable
-  :: M44 Double
+  :: String
+  -> Time
+  -> Res
+  -> Camera
+  -> M44 Double
   -> BackendOptions
-  -> [TextureObject]
+  -> [(Texture, TextureObject)]
   -> (Descriptor, R.Material)
   -> Drawable
-toDrawable xform' opts txos (d, mat') = dr
+toDrawable name' time' res' cam xform' opts txos (d, mat') = dr
   where
-    txos'  = zip [0..] txos :: [(Int, TextureObject)] 
+    apt'   = apt cam
+    foc'   = foc cam
+    xformC =  transform (controller cam) :: M44 Double
+    txs'   = R.textures mat'
+    txos'  = zip [0..] $ unzipWith txs' txos :: [(Int, (Texture, TextureObject))] 
     dr =
       Drawable
       { 
@@ -550,13 +573,9 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
     updateGame :: StateT Game IO Bool
     updateGame = do
       updateObjects
-      updateGUI 
       updateWidgets
       handleEvents
         where
-          updateGUI :: StateT Game IO ()
-          updateGUI = return () --undefined -- TODO: update/generate [wgt] based on game state/object state
-
           updateWidgets :: StateT Game IO ()
           updateWidgets = do
             modify solveWidgets
@@ -573,25 +592,24 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                           wgt { objects = filter selected $ objs g0 }
                         _ -> wgt
                         -- add square generation via geo shader per selected object
-
+          
           updateObjects :: StateT Game IO ()
           updateObjects = do
             --liftIO $ print ""
             TMSF.get >>= (liftIO . debug)
-            modify solveObjs 
+            modify solveObjs
             return ()
               where
                 debug :: Game -> IO ()
                 debug g0 = do
-                  let result = map selected $ objs g0
-                  print $ "debug : " ++ show result
+                  let result = selected . head $ objs g0
+                  print result
                 
                 solveObjs :: Game -> Game
                 solveObjs g0 =
-                  g0 {objs = objectSolver <$> objs g0}
+                  --TMSF.get >>= (liftIO . print)
+                  g0 { objs = (\obj -> foldr1 (!@!) $ solve (obj {slvrs = []}) <$> slvrs obj ) <$> objs g0 }
                   where
-                    objectSolver :: Object -> Object
-                    objectSolver obj = foldr1 (!@!) $ solve (obj {slvrs = [Identity]}) <$> slvrs obj
                     (!@!) :: Object -> Object -> Object
                     (!@!) obj0 obj1 =
                       obj0
@@ -619,7 +637,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                               { xform = identity & translation .~ pos
                               , slvrs = [updateSolver obj slv]
                               }
-                            ObjectSpace -> error "ObjectSpace solve undefined"
+                            ObjectSpace -> undefined
 
                         Rotate cs pos rord rxyz avel ->
                           obj
@@ -652,14 +670,14 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                             isSelected :: Camera -> V3 Double -> Double -> Bool
                             isSelected cam centroid radius = s
                               where
-                                camXform       =  transform . controller $ cam
-                                cameraPosition = (transform . controller $ cam)^.translation
-                                cameraLookat   = V3 0 0 (-1) *! camXform^._m33
-                                ivec           = normalize $ centroid - cameraPosition :: V3 Double
-                                s              = dot ivec cameraLookat > 1.0 - atan (radius / distance centroid cameraPosition) / pi
+                                cxform          = transform . controller $ cam
+                                camera_position = (transform . controller $ cam)^.translation
+                                camera_lookat   = V3 0 0 (-1) *! cxform^._m33
+                                ivec            = normalize $ centroid - camera_position :: V3 Double
+                                s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
-          --updateWidgets :: StateT Game IO ()
-          --updateWidgets = undefined
+          --updateGUI :: StateT Game IO ()
+          --updateGUI = undefined
 
           handleEvents :: StateT Game IO Bool
           handleEvents = do
@@ -693,30 +711,30 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                         Nothing     -> return ()
                         Just (_, k) -> case lookup k mapping of
                                           Nothing -> return ()
-                                          Just k'  -> k'
-                -- TODO: add camera panning, dolling
+                                          Just k  -> k
+                
                 mapKeyEvents :: [(Scancode, StateT Game IO ())]
                 mapKeyEvents =
                   [ (ScancodeW, inc   10)
                   , (ScancodeS, inc (-10))
-                  , (ScancodeEscape, quitE True)
+                  , (ScancodeEscape, quit True)
                   , (ScancodeQ, camRoll   1)
                   , (ScancodeE, camRoll (-1))
                   ]
                   where
                     camRoll :: Integer -> StateT Game IO ()
-                    camRoll n = modify camRoll'
+                    camRoll n = modify $ camRoll' n
                       where
-                        camRoll' :: Game -> Game
-                        camRoll' g0 = g0 { camera = updateCam n cam0 }
+                        camRoll' :: Integer -> Game -> Game
+                        camRoll' k g0 = g0 { camera = updateCam n cam0 }
                           where
                             cam0            = camera g0
                             updateCam :: Integer -> Camera -> Camera
-                            updateCam n' cam =
-                              cam { controller = updateController (controller cam)}
+                            updateCam n cam =
+                              cam { controller = updateController n (controller cam)}
                               where
-                                updateController :: Controllable -> Controllable
-                                updateController ctrl@(Controller _ mtx0 _ _ _) =
+                                updateController :: Integer -> Controllable -> Controllable
+                                updateController pos ctrl@(Controller _ mtx0 _ ypr0 _) =
                                   ctrl
                                   { transform = 
                                       mkTransformationMat
@@ -727,23 +745,23 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                     tr = view translation mtx0
                                     rot = 
                                       (mtx0^._m33)
-                                      !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (keyboardRS cam^._x * fromIntegral n')) -- yaw
+                                      !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (keyboardRS cam^._x * (fromIntegral n))) -- yaw
                           
                     inc :: Integer -> StateT Game IO ()
                     inc n = modify $ inc' n
                       where
                         inc' :: Integer -> Game -> Game
-                        inc' k g0 = g0 { uniforms = incUnis (tick g0 + k) (uniforms g0) }
+                        inc' k g0 = g0 { uniforms = incUnis (fromIntegral(tick g0 + k)) (uniforms g0) }
                           where
                             incUnis :: Integer -> Uniforms -> Uniforms
                             incUnis tick' unis0 = 
                               unis0 { u_time = fromInteger tick' }
                      
-                    quitE :: Bool -> StateT Game IO ()
-                    quitE b = modify $ quit' b
+                    quit :: Bool -> StateT Game IO ()
+                    quit b = modify $ quit' b
                       where
                         quit' :: Bool -> Game -> Game
-                        quit' b' g0 = g0 { quitGame = b' }
+                        quit' b gameLoopDelay = gameLoopDelay { quitGame = b }
 
                 updateMouse  :: [Event] -> StateT Game IO ()
                 updateMouse = mapM_ processEvent 
@@ -763,13 +781,13 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                               modify $ mmove' pos
                               where
                                 mmove' :: Point V2 CInt -> Game -> Game
-                                mmove' pos' g0 = g0 { camera = updateCam pos' (camera g0) }
+                                mmove' pos g0 = g0 { camera = updateCam pos (camera g0) }
                                   where
-                                    updateCam pos'' cam =
-                                      cam { controller = updateController pos'' (controller cam)}
+                                    updateCam pos cam =
+                                      cam { controller = updateController pos (controller cam)}
                                       where
                                         updateController :: Point V2 CInt -> Controllable -> Controllable
-                                        updateController _ ctrl@(Controller _ mtx0 _ _ _) =
+                                        updateController pos ctrl@(Controller _ mtx0 _ ypr0 _) =
                                           ctrl
                                           { transform = 
                                               mkTransformationMat
@@ -803,7 +821,7 @@ openWindow title (sizex,sizey) = do
                        }
      
     window <- SDL.createWindow
-              title --"MFS / SDL / OpenGL Example"
+            "MFS / SDL / OpenGL Example"
               SDL.defaultWindow
               { SDL.windowInitialSize     = V2 sizex sizey
               , SDL.windowGraphicsContext = OpenGLContext config }
@@ -836,8 +854,8 @@ toDescriptorMat :: FilePath -> IO [(Descriptor, R.Material)]
 toDescriptorMat file = do
   (stuff, mats) <- loadGltf file -- "models/pighead.gltf"
   mats' <- mapM fromGltfMaterial mats
-  --print mats'
-  ds    <- mapM (\((vs, idx), mat) -> initResources idx vs mat) $ zip (concat stuff) mats'
+  print mats'
+  ds    <- mapM (\((vs, idx), mat) -> initResources idx vs mat 0) $ zip (concat stuff) mats'
   return $ zip ds mats'
     where
       fromGltfMaterial :: Gltf.Material -> IO R.Material
@@ -850,8 +868,8 @@ toDescriptorMat file = do
 fromVertex3 :: Vertex3 Double -> [GLfloat]
 fromVertex3 (Vertex3 x y z) = [double2Float x, double2Float y, double2Float z]
 
-initResources :: [GLfloat] -> [GLenum] -> R.Material -> IO Descriptor
-initResources vs idx mat =  
+initResources :: [GLfloat] -> [GLenum] -> R.Material -> Double -> IO Descriptor
+initResources vs idx mat z0 =  
   do
     -- print $ mat
     -- | VAO
@@ -918,7 +936,10 @@ bufferOffset = plusPtr nullPtr . fromIntegral
   
 renderOutput :: Window -> GameSettings -> (Game, Maybe Bool) -> IO Bool
 renderOutput _ _ ( _,Nothing) = quit >> return True
-renderOutput window _ (g,_) = do
+renderOutput window gs (g,_) = do
+  let
+    timer = 0.01 * (fromIntegral $ tick g)
+    --ds'   = descriptor <$> drs g :: [Descriptor]
 
   clearColor $= Color4 0.0 0.0 0.0 1.0
   GL.clear [ColorBuffer, DepthBuffer]
@@ -929,7 +950,6 @@ renderOutput window _ (g,_) = do
   depthFunc $= Just Less
   cullFace  $= Just Back
 
-  --print $ wgts g
   mapM_ (renderObject (camera g) (uniforms g)) (objs g)
   mapM_ (renderWidget (camera g) (uniforms g)) (wgts g)
 
@@ -949,45 +969,43 @@ renderWidget cam unis' wgt = case wgt of
     where
       idrs = concatMap drws (icons wgt)
   TextField False _ _ _ _   -> do return ()
-  TextField _ s _ fmt _ -> do
+  TextField _ s fnts fmt opts -> -- TODO: add String rendering
     mapM_
-      (\dr -> do
+    (\dr -> do
         bindUniforms cam unis' dr 
         let (Descriptor triangles numIndices _) = descriptor dr
         bindVertexArrayObject $= Just triangles
         drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
-      ) $ formatText fmt wdrs s (0,0)
-  Selector active' icons' objs' -> -- TODO: why icons' is not 2?
-    mapM_ (\obj ->
-             do
-               print $ "SUKANAH!"
-               mapM_
-                 (\dr -> do
-                     bindUniforms cam unis' dr {u_xform = xform obj} 
-                     let (Descriptor triangles numIndices _) = descriptor dr
-                     bindVertexArrayObject $= Just triangles
-                     drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
-                 ) (drws (icons'!!1))) objs'
-  -- _ -> error "Unknown Widget type" -- TODO: implement selector
+        ) $ formatText fmt wdrs s (0,0)
+  Selector active' icons' objs' -> 
+    mapM_
+    (\obj -> do
+        mapM_
+          (\dr -> do
+              bindUniforms cam unis' dr {u_xform = xform obj} 
+              let (Descriptor triangles numIndices _) = descriptor dr
+              bindVertexArrayObject $= Just triangles
+              drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
+          ) (drws (icons'!!1))) objs'
   where
     wdrs = concatMap drws (fonts wgt)
 
 type CursorPos = (Integer, Integer)
 
 formatText :: Format -> [Drawable] -> [String] -> CursorPos -> [Drawable]
-formatText _   _    []  _     = []
+formatText fmt drws [] _  = []
 formatText fmt drws [s] (x,y) =
   formatString fmt drws s (x,y)
 formatText fmt drws (s:ss) (x,y) =
   formatText fmt drws [s] (x,y) ++ formatText fmt drws ss (x,y+1)
 
 formatString :: Format -> [Drawable] -> String -> CursorPos -> [Drawable]
-formatString _   _    []     _     = []
+formatString fmt drws []     (x,y) = []
 formatString fmt drws [c]    (x,y) = [formatChar fmt drws c (x,y)]
 formatString fmt drws (c:cs) (x,y) =  formatChar fmt drws c (x,y) : formatString fmt drws cs (x+1,y)
 
 formatChar :: Format -> [Drawable] -> Char -> CursorPos -> Drawable
-formatChar _ drws chr cpos =
+formatChar fmt drws chr cpos =
   case chr of
     ' ' -> offsetDrw cpos (drws!!0)
     '0' -> offsetDrw cpos (drws!!1)
@@ -1139,10 +1157,6 @@ bindUniforms cam' unis' dr =
     location4         <- SV.get (uniformLocation u_prog' "camera")
     uniform location4 $= camera
 
-    -- TODO: a prototype for a camera-space (pixel coordinate) projection
-    -- print $ "projection debug x,y : " ++ show ((((V4 0 0 0 1.0 *! (proj !*! u_cam'))^._x-0.5)*(-1))*resX)
-    --                            ++ " " ++ show ((((V4 0 0 0 1.0 *! (proj !*! u_cam'))^._y-0.5)*(-1))*resY)
-
     -- | Compensate world space xform with camera position
     -- = Object Position - Camera Position
     xform             <- GL.newMatrix RowMajor $ toList' (inv44 (identity & translation .~ u_cam'^.translation) !*! u_xform') :: IO (GLmatrix GLfloat)
@@ -1204,7 +1218,7 @@ bindUniforms cam' unis' dr =
 
     -- | Allocate Textures
     texture Texture2D        $= Enabled
-    mapM_ allocateTextures (dtxs dr) -- TODO: this is ignored, should bind an appropriate texture
+    mapM_ (allocateTextures u_prog') (dtxs dr) -- TODO: this is ignored, should bind an appropriate texture
 
     -- | Unload buffers
     bindVertexArrayObject         $= Nothing
@@ -1212,8 +1226,8 @@ bindUniforms cam' unis' dr =
       where        
         toList' = fmap realToFrac.concat.(fmap DF.toList.DF.toList) :: V4 (V4 Double) -> [GLfloat]
           
-allocateTextures :: (Int, TextureObject) -> IO ()
-allocateTextures (txid, txo) =
+allocateTextures :: Program -> (Int, (Texture, TextureObject)) -> IO ()
+allocateTextures program0 (txid, (tx, txo)) =
   do
     activeTexture $= TextureUnit (fromIntegral txid)
     textureBinding Texture2D $= Just txo
@@ -1244,16 +1258,12 @@ main = do
     initProject'= Main.initProject resX' resY'
     models'     = models     initProject' :: [FilePath]
     fonts'      = fontModels initProject' :: [FilePath]
-    icons'      = iconModels initProject' :: [FilePath]
-    --print $ "fonts' length : " ++ show (length fonts')
+    icons'      = iconModels initProject' :: [FilePath]    
+  --print $ "fonts' length : " ++ show (length fonts')
   
   -- TODO: if UUIDs are needed, generate like so:
   -- (const nextRandom) ()
   -- 10514e78-fa96-444a-8c3d-0a8445e771ad
-  print "DEBUG"
-  print $ "models' length : " ++ show (length models')
-  print $ "fonts'  length : " ++ show (length fonts')
-  print $ "icons'  length : " ++ show (length icons')
 
   initializeAll
   window <- openWindow "Mandelbrot + SDL2/OpenGL" (resX', resY')
@@ -1266,7 +1276,6 @@ main = do
   dms  <- mapM toDescriptorMat models' :: IO [[(Descriptor, R.Material)]]
   fdms <- mapM toDescriptorMat fonts'  :: IO [[(Descriptor, R.Material)]]
   idms <- mapM toDescriptorMat icons'  :: IO [[(Descriptor, R.Material)]]
-    --print $ "fdms length : " ++ show (length fdms)
     
   let -- this basically collects all the materials, reads textures from them and uniquely binds
     txs   = concatMap (\(_,m) -> R.textures m) $ concat dms
@@ -1286,11 +1295,8 @@ main = do
   txTuples  <- mapM (bindTexture'  txord) txs  :: IO [(Texture, TextureObject)]
   ftxTuples <- mapM (bindTexture' ftxord) ftxs :: IO [(Texture, TextureObject)]
   itxTuples <- mapM (bindTexture' itxord) itxs :: IO [(Texture, TextureObject)]
-  -- print $ "txTuples length : " ++ show (length txTuples)
-  -- print $ "dms      length : " ++ show (length dms)
-  -- print $ "preObjects prj length : " ++ show (length (preObjects prj))
-  -- print $ "preObjects : " ++ show (preObjects prj)
-  objs'  <- mapM (toObject txTuples dms) (preObjects prj) --toObjects     initProject' txTuples  dms
+
+  objs'  <- mapM (toObject txTuples dms)   (preObjects    prj) --toObjects     initProject' txTuples  dms
   fobjs' <- mapM (toObject ftxTuples fdms) (preFontObject prj) --toFontObjects initProject' ftxTuples fdms
   iobjs' <- mapM (toObject itxTuples idms) (preIconObject prj) --toFontObjects initProject' itxTuples idms
 
@@ -1367,15 +1373,15 @@ loadGltf fp = do
     mgrs = V.toList <$> V.toList meshPrimitives :: [[Model_glTF.MeshPrimitive]]
     positions = (fmap.fmap) (\(_, stuff) -> sPositions stuff) mgrs :: [[V.Vector Packed]]
     indices   = (fmap.fmap) (\(_, stuff) -> sIndices   stuff) mgrs 
-    idx       = (fmap.fmap) V.toList indices 
+    idx       = (fmap.fmap.fmap) fromIntegral $ (fmap.fmap) V.toList indices 
     attrs     = (fmap.fmap) (\(_, stuff) -> sAttrs     stuff) mgrs :: [[V.Vector VertexAttrs]]
-    uvs       = (fmap.fmap) vaTexCoord <$> (fmap.fmap) V.toList attrs 
-    colors    = (fmap.fmap) vaRGBA     <$> (fmap.fmap) V.toList attrs
-    --normals   = (fmap.fmap.fmap) vaNormal   $ (fmap.fmap) V.toList attrs
+    uvs       = (fmap.fmap.fmap) vaTexCoord $ (fmap.fmap) V.toList attrs 
+    colors    = (fmap.fmap.fmap) vaRGBA     $ (fmap.fmap) V.toList attrs
+    normals   = (fmap.fmap.fmap) vaNormal   $ (fmap.fmap) V.toList attrs
     matTuples = (fmap.fmap) (\(maybeMatTuple, _) -> fromMaybe (0, defaultGltfMat) maybeMatTuple) mgrs :: [[(Int, Gltf.Material)]]
     mats      = (fmap.fmap) snd matTuples :: [[Gltf.Material]]
 
-    ps = (fmap.fmap) (fromVec3' . unPacked) <$> (fmap.fmap) V.toList positions :: [[[(Float,Float,Float)]]]
+    ps = (fmap.fmap.fmap) (fromVec3' . unPacked) ((fmap.fmap) V.toList positions) :: [[[(Float,Float,Float)]]]
     cs = (fmap.fmap.fmap) fromVec4' colors :: [[[(Float,Float,Float,Float)]]]
     ts = (fmap.fmap.fmap) fromVec2' uvs
     d = (,,) <$$$.> ps <***.> cs <***.> ts
