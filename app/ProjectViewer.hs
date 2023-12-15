@@ -190,28 +190,15 @@ toObject txTuples' dms' pobj = do
   let
     dms      = (dms'!!) <$> modelIDXs pobj
     txs      = concatMap (\(_,m) -> R.textures m) $ concat dms :: [Texture]
-    txTuples = filter (\(tx,_) -> tx `elem` txs) txTuples' :: [(Texture, TextureObject)]
-    txos     = snd <$> txTuples :: [TextureObject]
+    txTuples = filter (\(tx,_) -> tx `elem` txs) txTuples'     :: [(Texture, TextureObject)]
     drs =
       toDrawable
-      ""
-      0.0
-      (1200, 720)
-      (camera initGame)
       (identity :: M44 Double) -- TODO: add result based on solvers composition
       defaultBackendOptions
       txTuples
       <$> concat dms
       :: [Drawable]
     
-    -- drs =
-    --   toDrawable
-    --   (identity :: M44 Double)
-    --   defaultBackendOptions
-    --   txos
-    --   <$> concat dms
-    --   :: [Drawable]
-
     obj =
       Object
       { xform    = identity :: M44 Double
@@ -530,20 +517,13 @@ unzipWith xs xys = xys'
     xys' = filter (\xy -> fst xy `elem` xs) xys
 
 toDrawable
-  :: String
-  -> Time
-  -> Res
-  -> Camera
-  -> M44 Double
+  :: M44 Double
   -> BackendOptions
   -> [(Texture, TextureObject)]
   -> (Descriptor, R.Material)
   -> Drawable
-toDrawable name' time' res' cam xform' opts txos (d, mat') = dr
+toDrawable xform' opts txos (d, mat') = dr
   where
-    apt'   = apt cam
-    foc'   = foc cam
-    xformC =  transform (controller cam) :: M44 Double
     txs'   = R.textures mat'
     txos'  = zip [0..] $ unzipWith txs' txos :: [(Int, (Texture, TextureObject))] 
     dr =
