@@ -2,7 +2,7 @@
     "name": "brackets",
     "fragShader": "./mat/brackets/src/shader.frag",
     "vertShader": "./mat/brackets/src/shader.vert",
-    "geomShader": null,
+    "geomShader": "./mat/brackets/src/house.gs",
     "textures": [
         {
             "name": "checkerboard",

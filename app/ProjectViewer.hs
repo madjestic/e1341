@@ -167,16 +167,7 @@ initObj =
   , slvrs    = []
   , selected = False
   }
-
-toObjects :: Project -> [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> IO [Object]
-toObjects  prj txTuples dms = mapM (toObject txTuples dms) (preObjects prj)
-
-toObjects' :: [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> [PreObject] -> IO [Object]
-toObjects' txTuples dms = mapM (toObject txTuples dms)
-
-toFontObjects :: Project -> [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> IO [Object]
-toFontObjects prj txTuples dms = mapM (toObject txTuples dms) (preFontObject prj)
-
+  
 testM44 :: M44 Double  
 testM44 =
   (V4
@@ -187,6 +178,7 @@ testM44 =
   
 toObject :: [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> PreObject -> IO Object
 toObject txTuples' dms' pobj = do
+  print $ (options pobj)
   let
     dms      = (dms'!!) <$> modelIDXs pobj
     txs      = concatMap (\(_,m) -> R.textures m) $ concat dms :: [Texture]
@@ -194,7 +186,7 @@ toObject txTuples' dms' pobj = do
     drs =
       toDrawable
       (identity :: M44 Double) -- TODO: add result based on solvers composition
-      defaultBackendOptions
+      (options pobj)
       txTuples
       <$> concat dms
       :: [Drawable]
@@ -429,7 +421,7 @@ initProject resx' resy' =
       , presolvers     = []
       , presolverAttrs = []
       , solvers        = [ Identity ]
-      , options        = defaultBackendOptions
+      , options        = defaultBackendOptions'
       }
     ]
   , cameras    = [ defaultCam ]
@@ -959,7 +951,8 @@ renderWidget cam unis' wgt = case wgt of
               bindUniforms cam unis' dr {u_xform = xform obj} 
               let (Descriptor triangles numIndices _) = descriptor dr
               bindVertexArrayObject $= Just triangles
-              drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
+              --drawElements (primitiveMode $ doptions dr) numIndices GL.UnsignedInt nullPtr
+              drawElements (GL.Lines) numIndices GL.UnsignedInt nullPtr
           ) (drws (icons'!!1))) objs'
   where
     wdrs = concatMap drws (fonts wgt)
@@ -1201,7 +1194,7 @@ bindUniforms cam' unis' dr =
         toList' = fmap realToFrac.concat.(fmap DF.toList.DF.toList) :: V4 (V4 Double) -> [GLfloat]
           
 allocateTextures :: (Int, (Texture, TextureObject)) -> IO ()
-allocateTextures (txid, (tx, txo)) =
+allocateTextures (txid, (_, txo)) =
   do
     activeTexture $= TextureUnit (fromIntegral txid)
     textureBinding Texture2D $= Just txo

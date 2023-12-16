@@ -6,30 +6,30 @@
 	"accessors":[
 		{
 			"bufferView":0,
-			"componentType":5121,
-			"count":6,
+			"componentType":5123,
+			"count":240,
 			"type":"SCALAR",
 			"min":[0
 			],
-			"max":[3
+			"max":[101
 			]
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":4,
+			"count":102,
 			"type":"VEC3",
-			"min":[-0.550000012,-0.550000012,0
+			"min":[-0.550999999,-0.550999999,0.499000013
 			],
-			"max":[0.550000012,0.550000012,0
+			"max":[0.550999999,0.550999999,0.500999987
 			]
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":4,
+			"count":102,
 			"type":"VEC4",
-			"min":[1,1,1,1
+			"min":[0.5,0.5,0.5,1
 			],
 			"max":[1,1,1,1
 			]
@@ -37,27 +37,27 @@
 		{
 			"bufferView":3,
 			"componentType":5126,
-			"count":4,
+			"count":102,
 			"type":"VEC3",
-			"min":[0,0,-1
+			"min":[-0.816497505,-0.816498578,-1
 			],
-			"max":[0,0,-1
+			"max":[0.816497505,0.816498578,1
 			]
 		},
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":4,
+			"count":102,
 			"type":"VEC2",
-			"min":[-0.0500000119,-1.04999995
+			"min":[-0.0500000119,0
 			],
-			"max":[1.04999995,0.0500000119
+			"max":[1,1
 			]
 		},
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":4,
+			"count":102,
 			"type":"SCALAR",
 			"min":[4.3210001
 			],
@@ -68,44 +68,44 @@
 	"buffers":[
 		{
 			"uri":"brackets_data.bin",
-			"byteLength":216,
+			"byteLength":5784,
 			"name":"main_buffer"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":6,
+			"byteLength":480,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteOffset":8,
-			"byteLength":48,
+			"byteOffset":480,
+			"byteLength":1224,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":56,
-			"byteLength":64,
+			"byteOffset":1704,
+			"byteLength":1632,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":120,
-			"byteLength":48,
+			"byteOffset":3336,
+			"byteLength":1224,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":168,
-			"byteLength":32,
+			"byteOffset":4560,
+			"byteLength":816,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":200,
-			"byteLength":16,
+			"byteOffset":5376,
+			"byteLength":408,
 			"target":34962
 		}
 	],
@@ -140,10 +140,7 @@
 				"baseColorFactor":[0.200000003,0.200000003,0.200000003,1
 				],
 				"metallicFactor":0,
-				"roughnessFactor":0.300000012,
-				"baseColorTexture":{
-					"index":0
-				}
+				"roughnessFactor":0.300000012
 			}
 		}
 	],
@@ -151,17 +148,6 @@
 		{
 			"nodes":[0
 			]
-		}
-	],
-	"textures":[
-		{
-			"source":0
-		}
-	],
-	"images":[
-		{
-			"uri":"checkerboard.png",
-			"mimeType":"image/png"
 		}
 	],
 	"scene":0
