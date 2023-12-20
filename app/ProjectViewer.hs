@@ -57,7 +57,7 @@ data Controllable
      { debug      :: (Int, Int)
      , transform  :: M44 Double
      , cvel       :: V3 Double  -- velocity
-     , ypr        :: V3 Double  -- yaw/pitch/camRoll
+     , ypr        :: V3 Double  -- yaw/pitch/camRoll ~angular velocity
      , yprS       :: V3 Double  -- yaw/pitch/camRoll Sum
      }
   deriving Show
@@ -81,9 +81,9 @@ defaultCam =
   , apt        = 50.0
   , foc        = 100.0
   , controller = defaultCamController
-  , mouseS     = -0.001
-  , keyboardRS = 0.1
-  , keyboardTS = 0.2
+  , mouseS     = -0.0025
+  , keyboardRS = 0.05
+  , keyboardTS = 0.05
   }
 
 defaultCamController :: Controllable
@@ -731,31 +731,43 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                               !*! fromQuaternion (axisAngle (mtx0^.(_m33._x)) (mouseS cam^._x * (fromIntegral $ pos^._y))) -- pitch
                                               !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (mouseS cam^._x * (fromIntegral $ pos^._x))) -- yaw
 
-                updateKeyboard :: (Monad m) => [(Scancode, m ())] -> [Event] -> m ()
+                updateKeyboard :: (Monad m) => [((Scancode, InputMotion), m ())] -> [Event] -> m ()
                 updateKeyboard emap = mapM_ (processEvent emap)
                   where
-                    processEvent :: (Monad m) => [(Scancode , m ())] -> Event -> m ()
+                    processEvent :: (Monad m) => [((Scancode, InputMotion) , m ())] -> Event -> m ()
                     processEvent mapping e =
-                      let mk = case eventPayload e of
-                                 KeyboardEvent keyboardEvent -> Just
-                                   ( keyboardEventKeyMotion keyboardEvent == Pressed
-                                   , keysymScancode (keyboardEventKeysym keyboardEvent))
-                                 _ -> Nothing
+                      let
+                        mk :: Maybe (Scancode, InputMotion)
+                        mk = case eventPayload e of
+                               KeyboardEvent keyboardEvent -> Just
+                                 ( keysymScancode (keyboardEventKeysym keyboardEvent)
+                                 , keyboardEventKeyMotion keyboardEvent )
+                               _ -> Nothing
                       in case mk of
                         Nothing     -> return ()
-                        Just (_, k) -> case lookup k mapping of
+                        Just (sc, km) -> case lookup (sc, km) mapping of -- TODO: find out how to map from (Scancode, InputMotion) to m ()
                                           Nothing -> return ()
                                           Just k'  -> k'
                 
-                mapKeyEvents :: [(Scancode, StateT Game IO ())]
+                mapKeyEvents :: [((Scancode, InputMotion), StateT Game IO ())]
                 mapKeyEvents =
-                  [ (ScancodeEscape, quitE True)
-                  , (ScancodeW, camDolly (-1))
-                  , (ScancodeS, camDolly   1)
-                  , (ScancodeQ, camRoll    1)
-                  , (ScancodeE, camRoll  (-1))
-                  , (ScancodeA, camPan   (-1))
-                  , (ScancodeD, camPan   ( 1))
+                  [ ((ScancodeEscape, Pressed)  , quitE True      )
+                  , ((ScancodeW     , Pressed)  , camDolly    (-1))
+                  , ((ScancodeW     , Released) , camDolly      0 )
+                  , ((ScancodeS     , Pressed)  , camDolly      1 )
+                  , ((ScancodeS     , Released) , camDolly      0 )
+                  , ((ScancodeQ     , Pressed)  , camRoll       1 )
+                  , ((ScancodeQ     , Released) , camRoll       0 )
+                  , ((ScancodeE     , Pressed)  , camRoll     (-1))
+                  , ((ScancodeE     , Released) , camRoll       0 )
+                  , ((ScancodeA     , Pressed)  , camTruck    (-1))
+                  , ((ScancodeA     , Released) , camTruck      0 )
+                  , ((ScancodeD     , Pressed)  , camTruck      1 )
+                  , ((ScancodeD     , Released) , camTruck      0 )
+                  , ((ScancodeZ     , Pressed)  , camPedestal ( 1))
+                  , ((ScancodeZ     , Released) , camPedestal   0 )
+                  , ((ScancodeC     , Pressed)  , camPedestal (-1))
+                  , ((ScancodeC     , Released) , camPedestal   0 )
                   ]
                   where
                     camDolly :: Integer -> StateT Game IO ()
@@ -770,25 +782,13 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateController :: Controllable -> Controllable
                                 updateController ctrl@(Controller _ mtx0 cvel0 ypr0 _) =
-                                  --ctrl { cvel = (LM.transpose mtx0^._m33) !* keyboardTS cam0 * V3 0 0 (fromIntegral n) }
-                                  --ctrl { cvel = V3 0 0 (fromIntegral n) }
                                   ctrl { cvel = keyboardTS cam0 * V3 0 0 (fromIntegral n) }
-                                  -- ctrl
-                                  -- { transform = 
-                                  --     mkTransformationMat
-                                  --     rot
-                                  --     tr
-                                  -- }
-                                  -- where
-                                  --   vel = LM.transpose rot !* V3 ( 0  )( 0 )( fromIntegral n )
-                                  --   tr  = view translation mtx0 + vel
-                                  --   rot = mtx0^._m33
 
-                    camPan :: Integer -> StateT Game IO ()
-                    camPan n = modify $ camPan'
+                    camTruck :: Integer -> StateT Game IO ()
+                    camTruck n = modify $ camTruck'
                       where
-                        camPan' :: Game -> Game
-                        camPan' g0 = g0 { camera = updateCam (camera g0) }
+                        camTruck' :: Game -> Game
+                        camTruck' g0 = g0 { camera = updateCam (camera g0) }
                           where
                             updateCam :: Camera -> Camera
                             updateCam cam0 =
@@ -797,18 +797,20 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                 updateController :: Controllable -> Controllable
                                 updateController ctrl@(Controller _ mtx0 cvel0 ypr0 _) =
                                   ctrl { cvel = keyboardTS cam0 * V3 (fromIntegral n) 0 0 }
-                                -- updateController :: Controllable -> Controllable
-                                -- updateController ctrl@(Controller _ mtx0 _ _ _) = 
-                                --   ctrl
-                                --   { transform = 
-                                --       mkTransformationMat
-                                --       rot
-                                --       tr
-                                --   }
-                                --   where
-                                --     vel = LM.transpose rot !* V3 ( fromIntegral n )( 0 )( 0 )
-                                --     tr  = view translation mtx0 + vel * keyboardTS cam
-                                --     rot = mtx0^._m33
+
+                    camPedestal :: Integer -> StateT Game IO ()
+                    camPedestal n = modify $ camPedestal'
+                      where
+                        camPedestal' :: Game -> Game
+                        camPedestal' g0 = g0 { camera = updateCam (camera g0) }
+                          where
+                            updateCam :: Camera -> Camera
+                            updateCam cam0 =
+                              cam0 { controller = updateController (controller cam0)}
+                              where
+                                updateController :: Controllable -> Controllable
+                                updateController ctrl@(Controller _ mtx0 cvel0 ypr0 _) =
+                                  ctrl { cvel = keyboardTS cam0 * V3 0 (fromIntegral n) 0 }
 
                     camRoll :: Integer -> StateT Game IO ()
                     camRoll n = modify $ camRoll'
@@ -822,17 +824,18 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateController :: Controllable -> Controllable
                                 updateController ctrl@(Controller _ mtx0 _ _ _) =
-                                  ctrl
-                                  { transform = 
-                                      mkTransformationMat
-                                      rot
-                                      tr
-                                  }
-                                  where
-                                    tr = view translation mtx0
-                                    rot = 
-                                      (mtx0^._m33)
-                                      !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (keyboardRS cam0^._x * fromIntegral n)) -- yaw
+                                  ctrl { ypr = keyboardRS cam0 * V3 0 0 (fromIntegral n)}
+                                  -- ctrl
+                                  -- { transform = 
+                                  --     mkTransformationMat
+                                  --     rot
+                                  --     tr
+                                  -- }
+                                  -- where
+                                  --   tr = view translation mtx0
+                                  --   rot = 
+                                  --     (mtx0^._m33)
+                                  --     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (keyboardRS cam0^._x * fromIntegral n)) -- yaw
                           
                     inc :: Integer -> StateT Game IO ()
                     inc n = modify $ inc' n
