@@ -375,24 +375,24 @@ initProject resx' resy' =
       , pidx           = 0
       , uuid           = nil
       , modelIDXs      = [0,1]
-      , tsolvers        =
+      , tsolvers       =
         [ Identity
         -- , Rotate
         --   { space = ObjectSpace
         --   , cxyz  = V3 0 0 0
         --   , rord  = XYZ
         --   , rxyz  = V3 0 0 (0.5)
-        --   , avel  = V3 0 0 0.01 }
+        --   , avel  = V3 0 0 0.05 }
         , Translate
           { space = WorldSpace
-          , txyz  = V3 1.1 0 0
+          , txyz  = V3 1.5 0 0
           , tvel  = V3 0.0 0 0 }
         , Rotate
           { space = ObjectSpace
           , cxyz  = V3 0 0 0
           , rord  = XYZ
           , rxyz  = V3 0 0 (0.5)
-          , avel  = V3 0 0 0.01 }
+          , avel  = V3 0 0 (0.1) }
         -- , Translate
         --  { space = WorldSpace
         --  , txyz  = V3 1.1 0 0
@@ -400,26 +400,6 @@ initProject resx' resy' =
         ]
       , osolvers        =
         [ Identity
-        -- , Rotate
-        --   { space = ObjectSpace
-        --   , cxyz  = V3 0 0 0
-        --   , rord  = XYZ
-        --   , rxyz  = V3 0 0 (0.5)
-        --   , avel  = V3 0 0 0.01 }
-        , Translate
-          { space = WorldSpace
-          , txyz  = V3 1.1 0 0
-          , tvel  = V3 0.0 0 0 }
-        , Rotate
-          { space = ObjectSpace
-          , cxyz  = V3 0 0 0
-          , rord  = XYZ
-          , rxyz  = V3 0 0 (0.5)
-          , avel  = V3 0 0 0.01 }
-        -- , Translate
-        --  { space = WorldSpace
-        --  , txyz  = V3 1.1 0 0
-        --  , tvel  = V3 0.0 0 0 }
         , Select
         ]
         , options        = defaultBackendOptions
@@ -579,7 +559,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
 
     updateGame :: StateT Game IO Bool
     updateGame = do
-      updateObjects'
+      updateObjects
       updateWidgets
       updateCameras
       handleEvents
@@ -600,7 +580,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
               solve :: M44 Double -> Solver -> M44 Double
               solve mtx0 slv =
                 case slv of
-                  Identity -> mtx0
+                  Identity -> identity
                   Translate cs pos _ ->
                     case cs of
                       WorldSpace  -> identity & translation .~ pos
@@ -661,8 +641,8 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                           wgt { objects = filter selected $ objs g0 }
                         _ -> wgt
 
-          updateObjects' :: StateT Game IO () -- TODO: finish refactor
-          updateObjects' = modify gameObjects
+          updateObjects :: StateT Game IO () -- TODO: finish refactor
+          updateObjects = modify gameObjects
             where
               gameObjects :: Game -> Game
               gameObjects g0 = g0 { objs = updateObject <$> objs g0 }
@@ -680,89 +660,6 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                           camera_lookat   = V3 0 0 (-1) *! cxform^._m33
                           ivec            = normalize $ centroid - camera_position :: V3 Double
                           s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
-
-          updateObjects :: StateT Game IO ()
-          updateObjects = do
-            --liftIO $ print ""
-            --TMSF.get >>= (liftIO . debug)
-            modify solveObjs
-            return ()
-              where
-                debug :: Game -> IO ()
-                debug g0 = do
-                  let result = selected . head $ objs g0
-                  print result
-                
-                solveObjs :: Game -> Game
-                solveObjs g0 =
-                  --TMSF.get >>= (liftIO . print)
-                  g0 { objs = (\obj -> foldr1 (!@!) $ solve (obj {oslvrs = []}) <$> oslvrs obj ) <$> objs g0 }
-                  where
-                    (!@!) :: Object -> Object -> Object
-                    (!@!) obj0 obj1 =
-                      obj0
-                      { transform = (transform obj0) {xform = xform (transform obj1) !*! xform (transform obj0)}
-                      , oslvrs   = oslvrs obj0 ++ oslvrs obj1
-                      , selected = selected obj1
-                      }
-                     
-                    updateSolver :: Solver -> Solver
-                    updateSolver slv =
-                      case slv of
-                        Identity               -> slv
-                        Translate _ pos vel    -> slv { txyz   = pos  + vel }
-                        Rotate _ _ _ rxyz avel -> slv { rxyz   = rxyz + avel }
-                        Select                 -> slv
-
-                    solve :: Object -> Solver -> Object
-                    solve obj slv =
-                      case slv of
-                        Identity -> obj { transform = (transform obj){ xform = identity }  }
-                        Translate cs pos _ ->
-                          case cs of
-                            WorldSpace  ->
-                              obj
-                              { transform = (transform obj){xform  = identity & translation .~ pos}
-                              , oslvrs    = [updateSolver slv]
-                              }
-                            ObjectSpace -> undefined
-
-                        Rotate _ _ rord rxyz _ ->
-                          obj
-                          { transform = (transform obj){xform = transform' identity}
-                          , oslvrs    = [updateSolver slv]
-                          }
-                          where
-                            transform' :: M44 Double -> M44 Double
-                            transform' mtx0 = mtx
-                              where
-                                mtx =
-                                  mkTransformationMat
-                                  rot
-                                  tr
-                                  where
-                                    rot    = 
-                                      identity !*!
-                                      case rord of
-                                        XYZ ->
-                                              fromQuaternion (axisAngle (mtx0^.(_m33._x)) (rxyz^._x)) -- pitch
-                                          !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (rxyz^._y)) -- yaw
-                                          !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (rxyz^._z)) -- roll
-                                    tr     = (identity::M44 Double)^.translation
-                        Select ->
-                          initObj
-                          { selected = lookedAt (head $ cameras g0) ((xform $ transform obj)^.translation) 0.1
-                          , oslvrs   = [updateSolver slv]
-                          }
-                          where
-                            lookedAt :: Camera -> V3 Double -> Double -> Bool
-                            lookedAt cam centroid radius = s
-                              where
-                                cxform          = xform . ctransform $ cam
-                                camera_position = (xform . ctransform $ cam)^.translation
-                                camera_lookat   = V3 0 0 (-1) *! cxform^._m33
-                                ivec            = normalize $ centroid - camera_position :: V3 Double
-                                s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
           handleEvents :: StateT Game IO Bool
           handleEvents = do
