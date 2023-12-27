@@ -52,25 +52,46 @@ import Graphics.RedViz.Material as R
 
 type DTime = Double
 
-data Controllable
-  =  Controller
-     { debug      :: (Int, Int)
-     , transform  :: M44 Double
-     , cvel       :: V3 Double  -- velocity
-     , ypr        :: V3 Double  -- yaw/pitch/camRoll ~angular velocity
-     , yprS       :: V3 Double  -- yaw/pitch/camRoll Sum
-     }
-  deriving Show
+data Transformable
+  =  Transformable
+     { xform  :: M44 Double
+     , tslvrs :: [Solver]
+     } deriving Show
 
-data Camera =
-     Camera
+defaultTransformable :: Transformable
+defaultTransformable =
+  Transformable
+  { xform =  
+      (V4
+        (V4 1 0 0 0)    -- <- . . . x ...
+        (V4 0 1 0 0)    -- <- . . . y ...
+        (V4 0 0 1 0)   -- <- . . . z-component of transform
+        (V4 0 0 0 1))
+  , tslvrs = [Identity]
+  }
+
+defaultCamTransformable :: Transformable
+defaultCamTransformable =
+  Transformable
+  { xform =  
+      (V4
+        (V4 1 0 0 0)    -- <- . . . x ...
+        (V4 0 1 0 0)    -- <- . . . y ...
+        (V4 0 0 1 10)   -- <- . . . z-component of transform
+        (V4 0 0 0 1))
+  , tslvrs = [Identity]
+  }
+  
+data Camera
+  =  Camera
      { name       :: String
      , apt        :: Double
      , foc        :: Double
-     , controller :: Controllable
+     , ctransform :: Transformable
      , mouseS     :: V3 Double -- mouse    "sensitivity"
      , keyboardRS :: V3 Double -- keyboard "rotation sensitivity"
      , keyboardTS :: V3 Double -- keyboard "translation sensitivity"
+     , cslvrs     :: [Solver]
      } deriving Show
 
 defaultCam :: Camera
@@ -80,27 +101,19 @@ defaultCam =
     name       = "PlayerCamera"
   , apt        = 50.0
   , foc        = 100.0
-  , controller = defaultCamController
+  , ctransform = defaultCamTransformable { tslvrs = [defaultCamSolver]}
   , mouseS     = -0.0025
   , keyboardRS = 0.05
   , keyboardTS = 0.05
   }
 
-defaultCamController :: Controllable
-defaultCamController =
-  ( Controller
-    { debug = (0,0)
-    , transform =  
-      (V4
-        (V4 1 0 0 0)    -- <- . . . x ...
-        (V4 0 1 0 0)    -- <- . . . y ...
-        (V4 0 0 1 10)   -- <- . . . z-component of transform
-        (V4 0 0 0 1))
-    , cvel  = (V3 0 0 0) -- velocity
-    , ypr   = (V3 0 0 0) -- rotation
-    , yprS  = (V3 0 0 0) -- sum of rotations
-    }
-  )
+defaultCamSolver :: Solver
+defaultCamSolver =
+  Controller
+  { cvel   = (V3 0 0 0) -- velocity
+  , cypr   = (V3 0 0 0) -- rotation
+  , cyprS  = (V3 0 0 0) -- sum of rotations
+  }
 
 data CoordSys =
     WorldSpace
@@ -122,6 +135,14 @@ data Solver =
     , avel  :: V3 Double -- angular velocity
     }
   | Select
+  | Controller
+    { cvel  :: V3 Double  -- velocity
+    , cypr  :: V3 Double  -- yaw/pitch/camRoll ~angular velocity
+    , cyprS :: V3 Double  -- yaw/pitch/camRoll Sum
+    }
+  | CameraParent Object
+    -- | Parent
+  --   { parent :: Object | Camera}
   deriving Show
 
 data RotationOrder =
@@ -141,31 +162,30 @@ instance Show PType where
 
 data PreObject
   =  PreObject
-     { pname          :: String
-     , ptype          :: PType
-     , pidx           :: Integer
-     , uuid           :: UUID
-     , modelIDXs      :: [Int]
-     , presolvers     :: [String]
-     , presolverAttrs :: [[Double]]
-     , solvers        :: [Solver]
-     , options        :: BackendOptions
+     { pname      :: String
+     , ptype      :: PType
+     , pidx       :: Integer
+     , uuid       :: UUID
+     , modelIDXs  :: [Int]
+     , tsolvers   :: [Solver] -- transformable solvers
+     , osolvers   :: [Solver] -- properties solvers
+     , options    :: BackendOptions
      } deriving Show
 
 data Object
   =  Object
-     { xform    :: M44 Double
-     , drws     :: [Drawable]
-     , slvrs    :: [Solver]
-     , selected :: Bool
+     { transform :: Transformable
+     , drws      :: [Drawable]
+     , selected  :: Bool
+     , oslvrs    :: [Solver]
      } deriving Show
 
 initObj :: Object
 initObj =
   Object
-  { xform    = identity :: M44 Double
+  { transform = defaultTransformable
   , drws     = []
-  , slvrs    = []
+  , oslvrs   = []
   , selected = False
   }
   
@@ -194,10 +214,10 @@ toObject txTuples' dms' pobj = do
     
     obj =
       Object
-      { xform    = identity :: M44 Double
-      , drws     = drs
-      , slvrs    = solvers pobj
-      , selected = False }
+      { transform = defaultTransformable {tslvrs = tsolvers pobj}
+      , drws      = drs
+      , oslvrs    = osolvers pobj
+      , selected  = False }
 
   return obj
 
@@ -231,9 +251,9 @@ defaultUniforms =
   , u_cam   = identity :: M44 Double
   , u_cam_a = 50.0
   , u_cam_f = 100.0
-  , u_cam_ypr   = (\(V3 x y z) -> (x,y,z)) $ ypr  defaultCamController
-  , u_cam_yprS  = (\(V3 x y z) -> (x,y,z)) $ yprS defaultCamController
-  , u_cam_vel   = (\(V3 x y z) -> (x,y,z)) $ cvel defaultCamController
+  , u_cam_ypr   = (0,0,0)
+  , u_cam_yprS  = (0,0,0)
+  , u_cam_vel   = (0,0,0)
   , u_cam_accel = (0,0,0) }
 
 data Project
@@ -249,7 +269,7 @@ data Project
      , preObjects     :: [PreObject]
      , preFontObject  :: [PreObject]
      , preIconObject  :: [PreObject]     
-     , cameras        :: [Camera]
+     , pcameras        :: [Camera]
      } deriving Show
 
 initProject :: Int -> Int -> Project
@@ -355,9 +375,7 @@ initProject resx' resy' =
       , pidx           = 0
       , uuid           = nil
       , modelIDXs      = [0,1]
-      , presolvers     = []
-      , presolverAttrs = []
-      , solvers        =
+      , tsolvers        =
         [ Identity
         -- , Rotate
         --   { space = ObjectSpace
@@ -369,12 +387,35 @@ initProject resx' resy' =
           { space = WorldSpace
           , txyz  = V3 1.1 0 0
           , tvel  = V3 0.0 0 0 }
+        , Rotate
+          { space = ObjectSpace
+          , cxyz  = V3 0 0 0
+          , rord  = XYZ
+          , rxyz  = V3 0 0 (0.5)
+          , avel  = V3 0 0 0.01 }
+        -- , Translate
+        --  { space = WorldSpace
+        --  , txyz  = V3 1.1 0 0
+        --  , tvel  = V3 0.0 0 0 }
+        ]
+      , osolvers        =
+        [ Identity
         -- , Rotate
         --   { space = ObjectSpace
         --   , cxyz  = V3 0 0 0
         --   , rord  = XYZ
         --   , rxyz  = V3 0 0 (0.5)
         --   , avel  = V3 0 0 0.01 }
+        , Translate
+          { space = WorldSpace
+          , txyz  = V3 1.1 0 0
+          , tvel  = V3 0.0 0 0 }
+        , Rotate
+          { space = ObjectSpace
+          , cxyz  = V3 0 0 0
+          , rord  = XYZ
+          , rxyz  = V3 0 0 (0.5)
+          , avel  = V3 0 0 0.01 }
         -- , Translate
         --  { space = WorldSpace
         --  , txyz  = V3 1.1 0 0
@@ -392,10 +433,7 @@ initProject resx' resy' =
       , pidx           = 0
       , uuid           = nil
       , modelIDXs      = [0..75]
-      , presolvers     = []
-      , presolverAttrs = []
-      , solvers        = [ Identity
-                         ]
+      , osolvers       = [ Identity ]
       , options        = defaultBackendOptions
       }
     ]
@@ -407,9 +445,7 @@ initProject resx' resy' =
       , pidx           = 0
       , uuid           = nil
       , modelIDXs      = [0]
-      , presolvers     = []
-      , presolverAttrs = []
-      , solvers        = [ Identity ]
+      , osolvers       = [ Identity ]
       , options        = defaultBackendOptions
       }
     , PreObject
@@ -419,13 +455,11 @@ initProject resx' resy' =
       , pidx           = 1
       , uuid           = nil
       , modelIDXs      = [1]
-      , presolvers     = []
-      , presolverAttrs = []
-      , solvers        = [ Identity ]
+      , osolvers       = [ Identity ]
       , options        = defaultBackendOptions'
       }
     ]
-  , cameras    = [ defaultCam ]
+  , pcameras    = [ defaultCam ]
   }
 
 data Alignment =
@@ -473,7 +507,7 @@ data Game = Game
   { tick     :: Integer
   , mpos     :: Point V2 CInt
   , quitGame :: Bool
-  , camera   :: Camera
+  , cameras  :: [Camera]
   , uniforms :: Uniforms
   , objs     :: [Object]
   , wgts     :: [Widget]
@@ -490,7 +524,7 @@ initGame =
   { tick     = -1
   , mpos     = P (V2 0 0)
   , quitGame = False
-  , camera   = defaultCam
+  , cameras  = [defaultCam]
   , uniforms = defaultUniforms
   , objs     = []
   , wgts     = []
@@ -545,36 +579,72 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
 
     updateGame :: StateT Game IO Bool
     updateGame = do
-      updateObjects
+      updateObjects'
       updateWidgets
-      updateCamera      
+      updateCameras
       handleEvents
         where
-          updateCamera :: StateT Game IO ()
-          updateCamera = modify gameCamera
+          solveTransformable :: Transformable -> Transformable
+          solveTransformable t0 =
+            t0 { xform  = foldr1 (!*!) $ solve (xform t0) <$> tslvrs t0
+               , tslvrs = updateSolver <$> tslvrs t0 }
             where
-              gameCamera :: Game -> Game
-              gameCamera g0 = g0 { camera = updateCamera' (camera g0)}
+              updateSolver :: Solver -> Solver
+              updateSolver slv =
+                case slv of
+                  Identity               -> slv
+                  Translate _ pos vel    -> slv { txyz   = pos  + vel }
+                  Rotate _ _ _ rxyz avel -> slv { rxyz   = rxyz + avel }
+                  _ -> slv
 
-              updateCamera' :: Camera -> Camera
-              updateCamera' cam0 = cam0 { controller = updateController (controller cam0)}
-                where
-                  updateController :: Controllable -> Controllable
-                  updateController ctrl@(Controller _ mtx0 cvel0 ypr0 yprS0) = -- TODO:
-                    ctrl { transform = mtx
-                         , yprS      = yprS'}
+              solve :: M44 Double -> Solver -> M44 Double
+              solve mtx0 slv =
+                case slv of
+                  Identity -> mtx0
+                  Translate cs pos _ ->
+                    case cs of
+                      WorldSpace  -> identity & translation .~ pos
+                      ObjectSpace -> undefined
+                  Rotate _ _ rord rxyz _ -> transform' identity
                     where
-                      yprS' = yprS0 + ypr0
-                      mtx   = 
-                        mkTransformationMat rot tr
+                      transform' :: M44 Double -> M44 Double
+                      transform' mtx0 = mtx
                         where
-                          rot = 
-                            (mtx0^._m33) !*!
-                                fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
-                            !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
-                            !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
-                          tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+                          mtx =
+                            mkTransformationMat
+                            rot
+                            tr
+                            where
+                              rot    = 
+                                identity !*!
+                                case rord of
+                                  XYZ ->
+                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (rxyz^._x)) -- pitch
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (rxyz^._y)) -- yaw
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (rxyz^._z)) -- roll
+                              tr     = (identity::M44 Double)^.translation
 
+                  Controller cvel0 ypr0 _ ->
+                    mkTransformationMat rot tr
+                    where
+                      rot = 
+                        (mtx0^._m33) !*!
+                            fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
+                        !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
+                        !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
+                      tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0                            
+                  _ -> identity
+
+          updateCameras :: StateT Game IO ()
+          updateCameras = modify gameCameras
+            where
+              gameCameras :: Game -> Game
+              gameCameras g0 = g0 { cameras = updateCamera <$> cameras g0 }
+                where
+                  updateCamera :: Camera -> Camera
+                  updateCamera cam0 =
+                    cam0 { ctransform = solveTransformable (ctransform cam0) }
+                    
           updateWidgets :: StateT Game IO ()
           updateWidgets = do
             modify solveWidgets
@@ -582,7 +652,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
               where
                 solveWidgets :: Game -> Game
                 solveWidgets g0 =
-                  g0 {wgts = widgetSolver <$> wgts g0} -- TODO: add object selectio (bounding brackets)
+                  g0 {wgts = widgetSolver <$> wgts g0}
                   where
                     widgetSolver :: Widget -> Widget
                     widgetSolver wgt =
@@ -590,8 +660,27 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                         Selector {} ->
                           wgt { objects = filter selected $ objs g0 }
                         _ -> wgt
-                        -- add square generation via geo shader per selected object
-          
+
+          updateObjects' :: StateT Game IO () -- TODO: finish refactor
+          updateObjects' = modify gameObjects
+            where
+              gameObjects :: Game -> Game
+              gameObjects g0 = g0 { objs = updateObject <$> objs g0 }
+                where
+                  updateObject :: Object -> Object
+                  updateObject obj0 =
+                    obj0 { transform = solveTransformable (transform obj0)
+                         , selected  = lookedAt (head $ cameras g0) (xform (transform obj0)^.translation) 0.1 }
+                    where
+                      lookedAt :: Camera -> V3 Double -> Double -> Bool
+                      lookedAt cam centroid radius = s
+                        where
+                          cxform          = xform . ctransform $ cam
+                          camera_position = (xform . ctransform $ cam)^.translation
+                          camera_lookat   = V3 0 0 (-1) *! cxform^._m33
+                          ivec            = normalize $ centroid - camera_position :: V3 Double
+                          s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
+
           updateObjects :: StateT Game IO ()
           updateObjects = do
             --liftIO $ print ""
@@ -607,18 +696,18 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                 solveObjs :: Game -> Game
                 solveObjs g0 =
                   --TMSF.get >>= (liftIO . print)
-                  g0 { objs = (\obj -> foldr1 (!@!) $ solve (obj {slvrs = []}) <$> slvrs obj ) <$> objs g0 }
+                  g0 { objs = (\obj -> foldr1 (!@!) $ solve (obj {oslvrs = []}) <$> oslvrs obj ) <$> objs g0 }
                   where
                     (!@!) :: Object -> Object -> Object
                     (!@!) obj0 obj1 =
                       obj0
-                      { xform = xform obj1 !*! xform obj0
-                      , slvrs = slvrs obj0 ++ slvrs obj1
+                      { transform = (transform obj0) {xform = xform (transform obj1) !*! xform (transform obj0)}
+                      , oslvrs   = oslvrs obj0 ++ oslvrs obj1
                       , selected = selected obj1
                       }
                      
-                    updateSolver :: Object -> Solver -> Solver
-                    updateSolver _ slv =
+                    updateSolver :: Solver -> Solver
+                    updateSolver slv =
                       case slv of
                         Identity               -> slv
                         Translate _ pos vel    -> slv { txyz   = pos  + vel }
@@ -628,24 +717,24 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                     solve :: Object -> Solver -> Object
                     solve obj slv =
                       case slv of
-                        Identity -> obj { xform = identity }
+                        Identity -> obj { transform = (transform obj){ xform = identity }  }
                         Translate cs pos _ ->
                           case cs of
                             WorldSpace  ->
                               obj
-                              { xform = identity & translation .~ pos
-                              , slvrs = [updateSolver obj slv]
+                              { transform = (transform obj){xform  = identity & translation .~ pos}
+                              , oslvrs    = [updateSolver slv]
                               }
                             ObjectSpace -> undefined
 
                         Rotate _ _ rord rxyz _ ->
                           obj
-                          { xform = transform identity
-                          , slvrs = [updateSolver obj slv]
+                          { transform = (transform obj){xform = transform' identity}
+                          , oslvrs    = [updateSolver slv]
                           }
                           where
-                            transform :: M44 Double -> M44 Double
-                            transform mtx0 = mtx
+                            transform' :: M44 Double -> M44 Double
+                            transform' mtx0 = mtx
                               where
                                 mtx =
                                   mkTransformationMat
@@ -662,15 +751,15 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                     tr     = (identity::M44 Double)^.translation
                         Select ->
                           initObj
-                          { selected = isSelected (camera g0) (xform obj^.translation) 0.1
-                          , slvrs    = [updateSolver obj slv]
+                          { selected = lookedAt (head $ cameras g0) ((xform $ transform obj)^.translation) 0.1
+                          , oslvrs   = [updateSolver slv]
                           }
                           where
-                            isSelected :: Camera -> V3 Double -> Double -> Bool
-                            isSelected cam centroid radius = s
+                            lookedAt :: Camera -> V3 Double -> Double -> Bool
+                            lookedAt cam centroid radius = s
                               where
-                                cxform          = transform . controller $ cam
-                                camera_position = (transform . controller $ cam)^.translation
+                                cxform          = xform . ctransform $ cam
+                                camera_position = (xform . ctransform $ cam)^.translation
                                 camera_lookat   = V3 0 0 (-1) *! cxform^._m33
                                 ivec            = normalize $ centroid - camera_position :: V3 Double
                                 s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
@@ -708,18 +797,19 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             mmove :: Point V2 CInt -> StateT Game IO ()
                             mmove pos = do
-                              modify $ mmove' pos
+                              modify $ mmove'
                               where
-                                mmove' :: Point V2 CInt -> Game -> Game
-                                mmove' pos' g0 = g0 { camera = updateCam pos' (camera g0) }
+                                mmove' :: Game -> Game
+                                mmove' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : tail (cameras g0) }
                                   where
-                                    updateCam pos'' cam =
-                                      cam { controller = updateController pos'' (controller cam)}
+                                    updateCam :: Camera -> Camera
+                                    updateCam cam =
+                                      cam { ctransform = updateTransformable pos (ctransform cam)}
                                       where
-                                        updateController :: Point V2 CInt -> Controllable -> Controllable
-                                        updateController _ ctrl@(Controller _ mtx0 _ _ _) =
-                                          ctrl
-                                          { transform = 
+                                        updateTransformable :: Point V2 CInt -> Transformable -> Transformable
+                                        updateTransformable _ t0@(Transformable mtx0 _) =
+                                          t0
+                                          { xform = 
                                               mkTransformationMat
                                               rot
                                               tr
@@ -745,7 +835,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                _ -> Nothing
                       in case mk of
                         Nothing     -> return ()
-                        Just (sc, km) -> case lookup (sc, km) mapping of -- TODO: find out how to map from (Scancode, InputMotion) to m ()
+                        Just (sc, km) -> case lookup (sc, km) mapping of
                                           Nothing -> return ()
                                           Just k'  -> k'
                 
@@ -770,72 +860,74 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                   , ((ScancodeC     , Released) , camPedestal   0 )
                   ]
                   where
+                    updateController :: Camera
+                                     -> V3 Double
+                                     -> V3 Double
+                                     -> Solver
+                                     -> Solver
+                    updateController cam vel0 ypr0 slv0 =
+                      case slv0 of
+                        ctrl@(Controller _ _ cyprS) ->
+                          ctrl { cvel  = keyboardTS cam * vel0
+                               , cypr  = keyboardRS cam * ypr0
+                               , cyprS = keyboardRS cam * ypr0 + cyprS } 
+                        _ -> slv0
+
                     camDolly :: Integer -> StateT Game IO ()
-                    camDolly n = modify $ camDolly'
+                    camDolly n = modify camDolly'
                       where
                         camDolly' :: Game -> Game
-                        camDolly' g0 = g0 { camera = updateCam (camera g0) }
+                        camDolly' g0 = g0 { cameras = updateCam (head $ cameras g0) : tail (cameras g0) }
                           where
                             updateCam :: Camera -> Camera
-                            updateCam cam0 =
-                              cam0 { controller = updateController (controller cam0)}
+                            updateCam cam =
+                              cam { ctransform = updateSolvers (ctransform cam)}
                               where
-                                updateController :: Controllable -> Controllable
-                                updateController ctrl@(Controller _ mtx0 cvel0 ypr0 _) =
-                                  ctrl { cvel = keyboardTS cam0 * V3 0 0 (fromIntegral n) }
-
+                                updateSolvers :: Transformable -> Transformable
+                                updateSolvers t0 =
+                                  t0 { tslvrs = updateController cam (V3 0 0 (fromIntegral n)) (V3 0 0 0) <$> tslvrs t0}
+                                    
                     camTruck :: Integer -> StateT Game IO ()
                     camTruck n = modify $ camTruck'
                       where
                         camTruck' :: Game -> Game
-                        camTruck' g0 = g0 { camera = updateCam (camera g0) }
+                        camTruck' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCam :: Camera -> Camera
-                            updateCam cam0 =
-                              cam0 { controller = updateController (controller cam0)}
+                            updateCam cam =
+                              cam { ctransform = updateSolvers (ctransform cam)}
                               where
-                                updateController :: Controllable -> Controllable
-                                updateController ctrl@(Controller _ mtx0 cvel0 ypr0 _) =
-                                  ctrl { cvel = keyboardTS cam0 * V3 (fromIntegral n) 0 0 }
-
+                                updateSolvers :: Transformable -> Transformable
+                                updateSolvers t0 =
+                                  t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
+                                    
                     camPedestal :: Integer -> StateT Game IO ()
                     camPedestal n = modify $ camPedestal'
                       where
                         camPedestal' :: Game -> Game
-                        camPedestal' g0 = g0 { camera = updateCam (camera g0) }
+                        camPedestal' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCam :: Camera -> Camera
-                            updateCam cam0 =
-                              cam0 { controller = updateController (controller cam0)}
+                            updateCam cam =
+                              cam { ctransform = updateSolvers (ctransform cam)}
                               where
-                                updateController :: Controllable -> Controllable
-                                updateController ctrl@(Controller _ mtx0 cvel0 ypr0 _) =
-                                  ctrl { cvel = keyboardTS cam0 * V3 0 (fromIntegral n) 0 }
+                                updateSolvers :: Transformable -> Transformable
+                                updateSolvers t0 =
+                                  t0 { tslvrs = updateController cam (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs t0}
 
                     camRoll :: Integer -> StateT Game IO ()
-                    camRoll n = modify $ camRoll'
+                    camRoll n = undefined --modify $ camRoll'
                       where
                         camRoll' :: Game -> Game
-                        camRoll' g0 = g0 { camera = updateCam (camera g0) }
+                        camRoll' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCam :: Camera -> Camera
-                            updateCam cam0 =
-                              cam0 { controller = updateController (controller cam0)}
+                            updateCam cam =
+                              cam { ctransform = updateSolvers (ctransform cam)}
                               where
-                                updateController :: Controllable -> Controllable
-                                updateController ctrl@(Controller _ mtx0 _ _ _) =
-                                  ctrl { ypr = keyboardRS cam0 * V3 0 0 (fromIntegral n)}
-                                  -- ctrl
-                                  -- { transform = 
-                                  --     mkTransformationMat
-                                  --     rot
-                                  --     tr
-                                  -- }
-                                  -- where
-                                  --   tr = view translation mtx0
-                                  --   rot = 
-                                  --     (mtx0^._m33)
-                                  --     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (keyboardRS cam0^._x * fromIntegral n)) -- yaw
+                                updateSolvers :: Transformable -> Transformable
+                                updateSolvers t0 =
+                                  t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 (fromIntegral n) 0) <$> tslvrs t0}
                           
                     inc :: Integer -> StateT Game IO ()
                     inc n = modify $ inc' n
@@ -998,8 +1090,8 @@ renderOutput window gs (g,_) = do
   depthFunc $= Just Less
   cullFace  $= Just Back
 
-  mapM_ (renderObject (camera g) (uniforms g)) (objs g)
-  mapM_ (renderWidget (camera g) (uniforms g)) (wgts g)
+  mapM_ (renderObject (head $ cameras g) (uniforms g)) (objs g)
+  mapM_ (renderWidget (head $ cameras g) (uniforms g)) (wgts g)
 
   glSwapWindow window >> return False
 
@@ -1017,7 +1109,7 @@ renderWidget cam unis' wgt = case wgt of
     where
       idrs = concatMap drws (icons wgt)
   TextField False _ _ _ _   -> do return ()
-  TextField _ s _ fmt _ -> -- TODO: add String rendering
+  TextField _ s _ fmt _ ->
     mapM_
     (\dr -> do
         bindUniforms cam unis' dr 
@@ -1030,7 +1122,7 @@ renderWidget cam unis' wgt = case wgt of
     (\obj -> do
         mapM_
           (\dr -> do
-              bindUniforms cam unis' dr {u_xform = xform obj} 
+              bindUniforms cam unis' dr {u_xform = xform (transform obj)} 
               let (Descriptor triangles numIndices _) = descriptor dr
               bindVertexArrayObject $= Just triangles
               --drawElements (primitiveMode $ doptions dr) numIndices GL.UnsignedInt nullPtr
@@ -1156,7 +1248,7 @@ formatDrw fmt dr = dr
 renderObject :: Camera -> Uniforms -> Object -> IO ()
 renderObject cam unis' obj = do
   mapM_ (\dr -> do
-            bindUniforms cam unis' dr {u_xform = (xform obj)} 
+            bindUniforms cam unis' dr {u_xform = xform (transform obj)} 
             let (Descriptor triangles numIndices _) = descriptor dr
             bindVertexArrayObject $= Just triangles
             drawElements GL.Triangles numIndices GL.UnsignedInt nullPtr
@@ -1169,7 +1261,7 @@ bindUniforms cam' unis' dr =
     let
       u_xform'  = u_xform  dr
       d'        = descriptor dr :: Descriptor
-      u_cam'    = (transform.controller) cam'
+      u_cam'    = (xform.ctransform) cam'
       u_mouse'  = (0,0)
       (Uniforms u_time' u_res' _ u_cam_a' u_cam_f' u_ypr' u_yprS' u_vel' u_accel') = unis'
       (Descriptor _ _ u_prog') = d'
@@ -1389,7 +1481,7 @@ main = do
             }
           , optionsW = defaultBackendOptions
           }
-        , Selector -- TODO: Why is there w render glitch?
+        , Selector
           { active  = True
           , icons   = iobjs'
           , objects = []
