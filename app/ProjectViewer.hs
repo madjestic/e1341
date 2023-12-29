@@ -52,6 +52,21 @@ import Graphics.RedViz.Material as R
 
 type DTime = Double
 
+-- data Behavior
+--   = Const
+--   | Speed
+--     { life :: Double
+--     , age  :: Double
+--     , rate :: Double
+--     , amp  :: Double
+--     , func :: Double -> Double
+--     }
+
+--instance Show (Double -> Double) where
+-- instance Show Behavior where
+--   show _ = "Behavior"
+--     --   show (Double -> Double)  = ""
+
 data Transformable
   =  Transformable
      { xform  :: M44 Double
@@ -123,16 +138,18 @@ data CoordSys =
 data Solver =
     Identity
   | Translate
-    { space :: CoordSys
-    , txyz  :: V3 Double -- offset
-    , tvel  :: V3 Double -- velocity
-    }
+    { space    :: CoordSys
+    , txyz     :: V3 Double -- offset
+    , tvel     :: V3 Double -- velocity
+    , kinslv  :: Solver
+    } 
   | Rotate
-    { space :: CoordSys
-    , cxyz  :: V3 Double -- center of rotation
-    , rord  :: RotationOrder
-    , rxyz  :: V3 Double
-    , avel  :: V3 Double -- angular velocity
+    { space    :: CoordSys
+    , cxyz     :: V3 Double -- center of rotation
+    , rord     :: RotationOrder
+    , rxyz     :: V3 Double
+    , avel     :: V3 Double -- angular velocity
+    , kinslv :: Solver
     }
   | Select
   | Controller
@@ -140,10 +157,22 @@ data Solver =
     , cypr  :: V3 Double  -- yaw/pitch/camRoll ~angular velocity
     , cyprS :: V3 Double  -- yaw/pitch/camRoll Sum
     }
-  | CameraParent Object
+  | Parent Object
     -- | Parent
   --   { parent :: Object | Camera}
-  deriving Show
+  | Speed
+    { life :: Double
+    , age  :: Double
+    , inc  :: Double
+    , amp  :: Double
+    , func :: Double -> Double
+    }
+--  deriving Show
+
+--instance Show (Double -> Double) where
+instance Show Solver where
+  show Speed{} = "Speed"
+  show s     = show s
 
 data RotationOrder =
   XYZ
@@ -384,15 +413,24 @@ initProject resx' resy' =
         --   , rxyz  = V3 0 0 (0.5)
         --   , avel  = V3 0 0 0.05 }
         , Translate
-          { space = WorldSpace
-          , txyz  = V3 1.5 0 0
-          , tvel  = V3 0.0 0 0 }
-        , Rotate
-          { space = ObjectSpace
-          , cxyz  = V3 0 0 0
-          , rord  = XYZ
-          , rxyz  = V3 0 0 (0.5)
-          , avel  = V3 0 0 (0.1) }
+          { space   = WorldSpace
+          , txyz    = V3 1.5 0 0
+          , tvel    = V3 0.0 0 0
+          , kinslv = Identity }
+          , Rotate
+          { space   = ObjectSpace
+          , cxyz    = V3 0 0 0
+          , rord    = XYZ
+          , rxyz    = V3 0 0 (0.5)
+          , avel    = V3 0 0 (0.1)
+          , kinslv =
+            Speed
+            { life = 1.0
+            , age  = 0.0
+            , inc  = 0.01
+            , amp  = 1.0
+            , func = id }
+          }
         -- , Translate
         --  { space = WorldSpace
         --  , txyz  = V3 1.1 0 0
@@ -566,26 +604,35 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
         where
           solveTransformable :: Transformable -> Transformable
           solveTransformable t0 =
-            t0 { xform  = foldr1 (!*!) $ solve (xform t0) <$> tslvrs t0
+            t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
                , tslvrs = updateSolver <$> tslvrs t0 }
             where
               updateSolver :: Solver -> Solver
               updateSolver slv =
                 case slv of
-                  Identity               -> slv
-                  Translate _ pos vel    -> slv { txyz   = pos  + vel }
-                  Rotate _ _ _ rxyz avel -> slv { rxyz   = rxyz + avel }
+                  Identity                 -> slv
+                  Translate  _ pos  vel  s -> slv { txyz   = pos  + vel  *@ s
+                                                  , kinslv = updateSolver s}
+                  Rotate _ _ _ rxyz avel s -> slv { rxyz   = rxyz + avel *@ s
+                                                  , kinslv = updateSolver s }
+                  Speed l a inc _ _        -> slv { age    = min (a + inc) l}
                   _ -> slv
 
-              solve :: M44 Double -> Solver -> M44 Double
-              solve mtx0 slv =
+              (*@) :: V3 Double -> Solver -> V3 Double
+              v *@ slv = 
+                case slv of
+                  Speed l a i amp f -> amp * f (l-a) *^ v
+                  _ -> v
+
+              solveXform :: M44 Double -> Solver -> M44 Double
+              solveXform mtx0 slv =
                 case slv of
                   Identity -> identity
-                  Translate cs pos _ ->
+                  Translate cs pos _ _ ->
                     case cs of
                       WorldSpace  -> identity & translation .~ pos
                       ObjectSpace -> undefined
-                  Rotate _ _ rord rxyz _ -> transform' identity
+                  Rotate _ _ rord rxyz _ _ -> transform' identity
                     where
                       transform' :: M44 Double -> M44 Double
                       transform' mtx0 = mtx
@@ -612,7 +659,8 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                             fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
-                      tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0                            
+                      tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+                  Parent obj0 -> undefined -- TODO: add inheriting transform from parent object
                   _ -> identity
 
           updateCameras :: StateT Game IO ()
