@@ -611,15 +611,15 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
               updateSolver slv =
                 case slv of
                   Identity                 -> slv
-                  Translate  _ pos  vel  s -> slv { txyz   = pos  + vel  *@ s
+                  Translate  _ pos  vel  s -> slv { txyz   = pos  + vel  `applySolver` s
                                                   , kinslv = updateSolver s}
-                  Rotate _ _ _ rxyz avel s -> slv { rxyz   = rxyz + avel *@ s
+                  Rotate _ _ _ rxyz avel s -> slv { rxyz   = rxyz + avel `applySolver` s
                                                   , kinslv = updateSolver s }
                   Speed l a inc _ _        -> slv { age    = min (a + inc) l}
                   _ -> slv
 
-              (*@) :: V3 Double -> Solver -> V3 Double
-              v *@ slv = 
+              applySolver :: V3 Double -> Solver -> V3 Double
+              applySolver v slv = 
                 case slv of
                   Speed l a i amp f -> amp * f (l-a) *^ v
                   _ -> v
