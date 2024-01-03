@@ -307,7 +307,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                   Rotate _ _ rord rxyz _ _ -> transform' identity
                     where
                       transform' :: M44 Double -> M44 Double
-                      transform' mtx0 = mtx
+                      transform' mtx0' = mtx
                         where
                           mtx =
                             mkTransformationMat
@@ -318,9 +318,9 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                 identity !*!
                                 case rord of
                                   XYZ ->
-                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (rxyz^._x)) -- pitch
-                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (rxyz^._y)) -- yaw
-                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (rxyz^._z)) -- roll
+                                        fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (rxyz^._x)) -- pitch
+                                    !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (rxyz^._y)) -- yaw
+                                    !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
                               tr     = (identity::M44 Double)^.translation
 
                   Controller cvel0 ypr0 _ ->
