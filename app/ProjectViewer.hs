@@ -37,6 +37,7 @@ import Linear.Matrix as LM
 import Data.Maybe (fromMaybe)
 import Data.Set as DS ( fromList, toList )
 import GHC.Generics
+import Data.UUID.V4
 
 import Load_glTF (loadMeshPrimitives)
 import Model_glTF
@@ -52,21 +53,6 @@ import Graphics.RedViz.Material as R
 
 type DTime = Double
 
--- data Behavior
---   = Const
---   | Speed
---     { life :: Double
---     , age  :: Double
---     , rate :: Double
---     , amp  :: Double
---     , func :: Double -> Double
---     }
-
---instance Show (Double -> Double) where
--- instance Show Behavior where
---   show _ = "Behavior"
---     --   show (Double -> Double)  = ""
-
 data Transformable
   =  Transformable
      { xform  :: M44 Double
@@ -78,8 +64,8 @@ defaultTransformable =
   Transformable
   { xform =  
       (V4
-        (V4 1 0 0 0)    -- <- . . . x ...
-        (V4 0 1 0 0)    -- <- . . . y ...
+        (V4 1 0 0 0)   -- <- . . . x ...
+        (V4 0 1 0 0)   -- <- . . . y ...
         (V4 0 0 1 0)   -- <- . . . z-component of transform
         (V4 0 0 0 1))
   , tslvrs = [Identity]
@@ -141,7 +127,7 @@ data Solver =
     { space    :: CoordSys
     , txyz     :: V3 Double -- offset
     , tvel     :: V3 Double -- velocity
-    , kinslv  :: Solver
+    , kinslv   :: Solver
     } 
   | Rotate
     { space    :: CoordSys
@@ -157,9 +143,9 @@ data Solver =
     , cypr  :: V3 Double  -- yaw/pitch/camRoll ~angular velocity
     , cyprS :: V3 Double  -- yaw/pitch/camRoll Sum
     }
-  | Parent Object
+  | Parent (Maybe Object)
     -- | Parent
-  --   { parent :: Object | Camera}
+  --   { sertParent :: Object | Camera}
   | Speed
     { life :: Double
     , age  :: Double
@@ -171,9 +157,12 @@ data Solver =
 
 --instance Show (Double -> Double) where
 instance Show Solver where
-  show Speed{} = "Speed"
-  show s     = show s
-
+  show Speed{}     = "Speed"
+  show Identity    = "Identity"
+  show Translate{} = "Translate"
+  show Rotate{}    = "Rotate"
+  show Select      = "Select"
+  show (Parent p)  = show p
 data RotationOrder =
   XYZ
 
@@ -194,19 +183,123 @@ data PreObject
      { pname      :: String
      , ptype      :: PType
      , pidx       :: Integer
-     , uuid       :: UUID
+     , puuid      :: UUID
      , modelIDXs  :: [Int]
      , tsolvers   :: [Solver] -- transformable solvers
      , osolvers   :: [Solver] -- properties solvers
      , options    :: BackendOptions
+     , pparent    :: UUID
+     , pchildren  :: [PreObject]
      } deriving Show
 
+testPreObject :: PreObject
+testPreObject = 
+    PreObject
+    {
+      pname          = "pig_object"
+    , ptype          = Default
+    , pidx           = 0
+    , puuid          = nil
+    , modelIDXs      = [0]
+    , tsolvers       =
+      [ Identity
+      -- , Rotate
+      --   { space = ObjectSpace
+      --   , cxyz  = V3 0 0 0
+      --   , rord  = XYZ
+      --   , rxyz  = V3 0 0 (0.5)
+      --   , avel  = V3 0 0 0.05 }
+      , Translate
+        { space   = WorldSpace
+        , txyz    = V3 1.5 0 0
+        , tvel    = V3 0.0 0 0
+        , kinslv = Identity }
+        -- , Rotate
+        -- { space   = ObjectSpace
+        -- , cxyz    = V3 0 0 0
+        -- , rord    = XYZ
+        -- , rxyz    = V3 0 0 (0.5)
+        -- , avel    = V3 0 0 (0.1)
+        -- , kinslv  = Identity
+        --   -- Speed
+        --   -- { life = 1.0
+        --   -- , age  = 0.0
+        --   -- , inc  = 0.01
+        --   -- , amp  = 1.0
+        --   -- , func = id }
+        -- }
+      -- , Translate
+      --  { space = WorldSpace
+      --  , txyz  = V3 1.1 0 0
+      --  , tvel  = V3 0.0 0 0 }
+      ]
+    , osolvers    =
+      [ Identity
+      , Select
+      ]
+      , options   = defaultBackendOptions
+      , pparent   = nil
+      , pchildren =
+        [ PreObject
+          {
+            pname          = "grid_object"
+          , ptype          = Default
+          , pidx           = 0
+          , puuid          = nil
+          , modelIDXs      = [1]
+          , tsolvers       =
+            [ Identity
+            -- , Rotate
+            --   { space = ObjectSpace
+            --   , cxyz  = V3 0 0 0
+            --   , rord  = XYZ
+            --   , rxyz  = V3 0 0 (0.5)
+            --   , avel  = V3 0 0 0.05 }
+            , Translate
+              { space   = WorldSpace
+              , txyz    = V3 1.5 0 0
+              , tvel    = V3 0.0 0 0
+              , kinslv = Identity }
+              , Rotate
+              { space   = ObjectSpace
+              , cxyz    = V3 0 0 0
+              , rord    = XYZ
+              , rxyz    = V3 0 0 (0.5)
+              , avel    = V3 0 0 (0.02)
+              , kinslv  = Identity
+                -- Speed
+                -- { life = 1.0
+                -- , age  = 0.0
+                -- , inc  = 0.01
+                -- , amp  = 1.0
+                -- , func = id }
+              }
+            -- , Translate
+            --  { space = WorldSpace
+            --  , txyz  = V3 1.1 0 0
+            --  , tvel  = V3 0.0 0 0 }
+              , Parent Nothing
+            ]
+          , osolvers  =
+            [ Identity
+            , Select
+            ]
+            , options   = defaultBackendOptions
+            , pparent   = nil
+            , pchildren = []
+          }            
+        ]
+    }      
+
+  
 data Object
   =  Object
      { transform :: Transformable
      , drws      :: [Drawable]
      , selected  :: Bool
      , oslvrs    :: [Solver]
+     , uuid      :: UUID
+     , parent    :: UUID
      } deriving Show
 
 initObj :: Object
@@ -246,7 +339,10 @@ toObject txTuples' dms' pobj = do
       { transform = defaultTransformable {tslvrs = tsolvers pobj}
       , drws      = drs
       , oslvrs    = osolvers pobj
-      , selected  = False }
+      , selected  = False
+      , uuid      = puuid   pobj
+      , parent    = pparent pobj
+      }
 
   return obj
 
@@ -301,6 +397,86 @@ data Project
      , pcameras        :: [Camera]
      } deriving Show
 
+sharedFonts :: [FilePath]
+sharedFonts =
+  [ "models/fnt_space.gltf"
+  , "models/fnt_0.gltf"
+  , "models/fnt_1.gltf"
+  , "models/fnt_2.gltf"
+  , "models/fnt_3.gltf"
+  , "models/fnt_4.gltf"
+  , "models/fnt_5.gltf"
+  , "models/fnt_6.gltf"
+  , "models/fnt_7.gltf"
+  , "models/fnt_8.gltf"
+  , "models/fnt_9.gltf"
+  , "models/fnt_a.gltf"
+  , "models/fnt_b.gltf"
+  , "models/fnt_c.gltf"
+  , "models/fnt_d.gltf"
+  , "models/fnt_e.gltf"
+  , "models/fnt_f.gltf"
+  , "models/fnt_g.gltf"
+  , "models/fnt_h.gltf"
+  , "models/fnt_i.gltf"
+  , "models/fnt_j.gltf"
+  , "models/fnt_k.gltf"
+  , "models/fnt_l.gltf"
+  , "models/fnt_m.gltf"
+  , "models/fnt_n.gltf"
+  , "models/fnt_o.gltf"
+  , "models/fnt_p.gltf"
+  , "models/fnt_q.gltf"
+  , "models/fnt_r.gltf"
+  , "models/fnt_s.gltf"
+  , "models/fnt_t.gltf"
+  , "models/fnt_u.gltf"
+  , "models/fnt_v.gltf"
+  , "models/fnt_w.gltf"
+  , "models/fnt_x.gltf"
+  , "models/fnt_y.gltf"
+  , "models/fnt_z.gltf"
+  , "models/fnt_plus.gltf"
+  , "models/fnt_minus.gltf"
+  , "models/fnt_equal.gltf"
+  , "models/fnt_gt.gltf"
+  , "models/fnt_comma.gltf"
+  , "models/fnt_dot.gltf"
+  , "models/fnt_question.gltf"
+  , "models/fnt_exclam.gltf"
+  , "models/fnt_asterics.gltf"
+  , "models/fnt_slash.gltf"
+  , "models/fnt_semicolon.gltf"
+  , "models/fnt_quote.gltf"
+  , "models/fnt_A.gltf"
+  , "models/fnt_B.gltf"
+  , "models/fnt_C.gltf"
+  , "models/fnt_D.gltf"
+  , "models/fnt_E.gltf"
+  , "models/fnt_F.gltf"
+  , "models/fnt_G.gltf"
+  , "models/fnt_H.gltf"
+  , "models/fnt_I.gltf"
+  , "models/fnt_J.gltf"
+  , "models/fnt_K.gltf"
+  , "models/fnt_L.gltf"
+  , "models/fnt_M.gltf"
+  , "models/fnt_N.gltf"
+  , "models/fnt_O.gltf"
+  , "models/fnt_P.gltf"
+  , "models/fnt_Q.gltf"
+  , "models/fnt_R.gltf"
+  , "models/fnt_S.gltf"
+  , "models/fnt_T.gltf"
+  , "models/fnt_U.gltf"
+  , "models/fnt_V.gltf"
+  , "models/fnt_W.gltf"
+  , "models/fnt_X.gltf"
+  , "models/fnt_Y.gltf"
+  , "models/fnt_Z.gltf"
+  , "models/fnt_crosshair.gltf"
+  ]  
+
 initProject :: Int -> Int -> Project
 initProject resx' resy' =
   Project
@@ -313,84 +489,7 @@ initProject resx' resy' =
     [ "models/pighead.gltf"
     , "models/grid.gltf"
     ]
-  , fontModels =
-    [ "models/fnt_space.gltf"
-    , "models/fnt_0.gltf"
-    , "models/fnt_1.gltf"
-    , "models/fnt_2.gltf"
-    , "models/fnt_3.gltf"
-    , "models/fnt_4.gltf"
-    , "models/fnt_5.gltf"
-    , "models/fnt_6.gltf"
-    , "models/fnt_7.gltf"
-    , "models/fnt_8.gltf"
-    , "models/fnt_9.gltf"
-    , "models/fnt_a.gltf"
-    , "models/fnt_b.gltf"
-    , "models/fnt_c.gltf"
-    , "models/fnt_d.gltf"
-    , "models/fnt_e.gltf"
-    , "models/fnt_f.gltf"
-    , "models/fnt_g.gltf"
-    , "models/fnt_h.gltf"
-    , "models/fnt_i.gltf"
-    , "models/fnt_j.gltf"
-    , "models/fnt_k.gltf"
-    , "models/fnt_l.gltf"
-    , "models/fnt_m.gltf"
-    , "models/fnt_n.gltf"
-    , "models/fnt_o.gltf"
-    , "models/fnt_p.gltf"
-    , "models/fnt_q.gltf"
-    , "models/fnt_r.gltf"
-    , "models/fnt_s.gltf"
-    , "models/fnt_t.gltf"
-    , "models/fnt_u.gltf"
-    , "models/fnt_v.gltf"
-    , "models/fnt_w.gltf"
-    , "models/fnt_x.gltf"
-    , "models/fnt_y.gltf"
-    , "models/fnt_z.gltf"
-    , "models/fnt_plus.gltf"
-    , "models/fnt_minus.gltf"
-    , "models/fnt_equal.gltf"
-    , "models/fnt_gt.gltf"
-    , "models/fnt_comma.gltf"
-    , "models/fnt_dot.gltf"
-    , "models/fnt_question.gltf"
-    , "models/fnt_exclam.gltf"
-    , "models/fnt_asterics.gltf"
-    , "models/fnt_slash.gltf"
-    , "models/fnt_semicolon.gltf"
-    , "models/fnt_quote.gltf"
-    , "models/fnt_A.gltf"
-    , "models/fnt_B.gltf"
-    , "models/fnt_C.gltf"
-    , "models/fnt_D.gltf"
-    , "models/fnt_E.gltf"
-    , "models/fnt_F.gltf"
-    , "models/fnt_G.gltf"
-    , "models/fnt_H.gltf"
-    , "models/fnt_I.gltf"
-    , "models/fnt_J.gltf"
-    , "models/fnt_K.gltf"
-    , "models/fnt_L.gltf"
-    , "models/fnt_M.gltf"
-    , "models/fnt_N.gltf"
-    , "models/fnt_O.gltf"
-    , "models/fnt_P.gltf"
-    , "models/fnt_Q.gltf"
-    , "models/fnt_R.gltf"
-    , "models/fnt_S.gltf"
-    , "models/fnt_T.gltf"
-    , "models/fnt_U.gltf"
-    , "models/fnt_V.gltf"
-    , "models/fnt_W.gltf"
-    , "models/fnt_X.gltf"
-    , "models/fnt_Y.gltf"
-    , "models/fnt_Z.gltf"
-    , "models/fnt_crosshair.gltf"
-    ]
+  , fontModels = sharedFonts
   , iconModels =
     [
       "models/fnt_crosshair.gltf"
@@ -402,7 +501,7 @@ initProject resx' resy' =
         pname          = "test_object"
       , ptype          = Default
       , pidx           = 0
-      , uuid           = nil
+      , puuid          = nil
       , modelIDXs      = [0,1]
       , tsolvers       =
         [ Identity
@@ -449,7 +548,7 @@ initProject resx' resy' =
         pname          = "fonts"
       , ptype          = Font
       , pidx           = 0
-      , uuid           = nil
+      , puuid          = nil
       , modelIDXs      = [0..75]
       , osolvers       = [ Identity ]
       , options        = defaultBackendOptions
@@ -461,7 +560,7 @@ initProject resx' resy' =
         pname          = "crosshair"
       , ptype          = Icon
       , pidx           = 0
-      , uuid           = nil
+      , puuid          = nil
       , modelIDXs      = [0]
       , osolvers       = [ Identity ]
       , options        = defaultBackendOptions
@@ -471,7 +570,7 @@ initProject resx' resy' =
         pname          = "brackets"
       , ptype          = Icon
       , pidx           = 1
-      , uuid           = nil
+      , puuid          = nil
       , modelIDXs      = [1]
       , osolvers       = [ Identity ]
       , options        = defaultBackendOptions'
@@ -479,6 +578,160 @@ initProject resx' resy' =
     ]
   , pcameras    = [ defaultCam ]
   }
+
+parentTestProject :: Int -> Int -> Project
+parentTestProject resx' resy' =
+  Project
+  {  
+    projname = "Test Project"
+  , resx    = resx'
+  , resy    = resy'
+  , camMode = "AbsoluteLocation"
+  , models  =
+    [ "models/pighead.gltf"
+    , "models/grid.gltf"
+    ]
+  , fontModels = sharedFonts
+  , iconModels =
+    [
+      "models/fnt_crosshair.gltf"
+    , "models/brackets.gltf"
+    ]
+  , preObjects = 
+    [ PreObject
+      {
+        pname          = "pig_object"
+      , ptype          = Default
+      , pidx           = 0
+      , puuid          = nil
+      , modelIDXs      = [0]
+      , tsolvers       =
+        [ Identity
+        -- , Rotate
+        --   { space = ObjectSpace
+        --   , cxyz  = V3 0 0 0
+        --   , rord  = XYZ
+        --   , rxyz  = V3 0 0 (0.5)
+        --   , avel  = V3 0 0 0.05 }
+        , Translate
+          { space   = WorldSpace
+          , txyz    = V3 1.5 0 0
+          , tvel    = V3 0.0 0 0
+          , kinslv = Identity }
+          -- , Rotate
+          -- { space   = ObjectSpace
+          -- , cxyz    = V3 0 0 0
+          -- , rord    = XYZ
+          -- , rxyz    = V3 0 0 (0.5)
+          -- , avel    = V3 0 0 (0.1)
+          -- , kinslv  = Identity
+          --   -- Speed
+          --   -- { life = 1.0
+          --   -- , age  = 0.0
+          --   -- , inc  = 0.01
+          --   -- , amp  = 1.0
+          --   -- , func = id }
+          -- }
+        -- , Translate
+        --  { space = WorldSpace
+        --  , txyz  = V3 1.1 0 0
+        --  , tvel  = V3 0.0 0 0 }
+        ]
+      , osolvers    =
+        [ Identity
+        , Select
+        ]
+        , options   = defaultBackendOptions
+        , pparent   = nil
+        , pchildren =
+          [ PreObject
+            {
+              pname          = "grid_object"
+            , ptype          = Default
+            , pidx           = 0
+            , puuid          = nil
+            , modelIDXs      = [1]
+            , tsolvers       =
+              [ Identity
+              -- , Rotate
+              --   { space = ObjectSpace
+              --   , cxyz  = V3 0 0 0
+              --   , rord  = XYZ
+              --   , rxyz  = V3 0 0 (0.5)
+              --   , avel  = V3 0 0 0.05 }
+              , Translate
+                { space   = WorldSpace
+                , txyz    = V3 1.5 0 0
+                , tvel    = V3 0.0 0 0
+                , kinslv = Identity }
+                , Rotate
+                { space   = ObjectSpace
+                , cxyz    = V3 0 0 0
+                , rord    = XYZ
+                , rxyz    = V3 0 0 (0.5)
+                , avel    = V3 0 0 (0.02)
+                , kinslv  = Identity
+                  -- Speed
+                  -- { life = 1.0
+                  -- , age  = 0.0
+                  -- , inc  = 0.01
+                  -- , amp  = 1.0
+                  -- , func = id }
+                }
+              -- , Translate
+              --  { space = WorldSpace
+              --  , txyz  = V3 1.1 0 0
+              --  , tvel  = V3 0.0 0 0 }
+                , Parent Nothing
+              ]
+            , osolvers  =
+              [ Identity
+              , Select
+              ]
+              , options   = defaultBackendOptions
+              , pparent   = nil
+              , pchildren = []
+            }            
+          ]
+      }      
+    ]
+  , preFontObject =
+    [ PreObject
+      {
+        pname          = "fonts"
+      , ptype          = Font
+      , pidx           = 0
+      , puuid          = nil
+      , modelIDXs      = [0..75]
+      , osolvers       = [ Identity ]
+      , options        = defaultBackendOptions
+      }
+    ]
+  , preIconObject =
+    [ PreObject
+      {
+        pname          = "crosshair"
+      , ptype          = Icon
+      , pidx           = 0
+      , puuid          = nil
+      , modelIDXs      = [0]
+      , osolvers       = [ Identity ]
+      , options        = defaultBackendOptions
+      }
+    , PreObject
+      {
+        pname          = "brackets"
+      , ptype          = Icon
+      , pidx           = 1
+      , puuid          = nil
+      , modelIDXs      = [1]
+      , osolvers       = [ Identity ]
+      , options        = defaultBackendOptions'
+      }
+    ]
+  , pcameras    = [ defaultCam ]
+  }
+  
 
 data Alignment =
    TL |TC |TR
@@ -581,6 +834,42 @@ toDrawable xform' opts txos (d, mat') = dr
       , doptions   = opts
       }
 
+setProjectUUID :: Project -> IO Project
+setProjectUUID prj0 = do
+  pobjs' <- mapM setUUID (preObjects prj0)
+  return prj0 { preObjects = pobjs' }
+
+setUUID :: PreObject -> IO PreObject
+setUUID pobj0@(PreObject{pchildren = []}) = do
+  genUUID  <- nextRandom :: IO UUID
+  return pobj0 { puuid = genUUID }
+setUUID pobj0@(PreObject{pchildren = [p]}) = do
+  genUUID  <- nextRandom :: IO UUID
+  genUUID' <- nextRandom :: IO UUID
+  return pobj0 { puuid     = genUUID
+               , pchildren = [p { pparent = genUUID
+                                , puuid   = genUUID'}] }
+setUUID pobj0@(PreObject{pchildren = (p:ps)}) = do
+  genUUID  <- nextRandom :: IO UUID
+  p'  <- setUUID p --(p{pparent = genUUID})
+  ps' <- mapM setUUID ps
+  return pobj0 { puuid     = genUUID 
+               , pchildren = p':ps' }
+
+flatten :: PreObject -> [PreObject]
+flatten pobj0@(PreObject{pchildren = []})     = [childFree pobj0]
+flatten pobj0@(PreObject{pchildren = [p]})    = childFree pobj0 : flatten p
+flatten pobj0@(PreObject{pchildren = (p:ps)}) = childFree pobj0 : concat (flatten p : (flatten <$> ps))
+
+childFree :: PreObject -> PreObject
+childFree pobj0 = (pobj0{pchildren = []})
+
+--testPreObject' <- setUUID testPreObject
+--flatten testPreObject'
+
+-- lookupObject :: Object -> UUID -> Object
+-- lookupObject obj0 uuid0 = obj0  
+
 runGame :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
   where
@@ -660,7 +949,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                       tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
-                  Parent obj0 -> undefined -- TODO: add inheriting transform from parent object
+                  Parent obj0 -> identity -- TODO: add inheriting transform from sertParent object
                   _ -> identity
 
           updateCameras :: StateT Game IO ()
@@ -1341,15 +1630,13 @@ main = do
           ( unsafeCoerce $ fromIntegral $ resX opts
           , unsafeCoerce $ fromIntegral $ resY opts))
       initSettings
-    initProject'= Main.initProject resX' resY'
+  parentTestProject' <- setProjectUUID $ parentTestProject resX' resY'
+
+  let
+    initProject'= parentTestProject'
     models'     = models     initProject' :: [FilePath]
     fonts'      = fontModels initProject' :: [FilePath]
     icons'      = iconModels initProject' :: [FilePath]    
-  --print $ "fonts' length : " ++ show (length fonts')
-  
-  -- TODO: if UUIDs are needed, generate like so:
-  -- (const nextRandom) ()
-  -- 10514e78-fa96-444a-8c3d-0a8445e771ad
 
   initializeAll
   window <- openWindow "Mandelbrot + SDL2/OpenGL" (resX', resY')
@@ -1382,7 +1669,8 @@ main = do
   ftxTuples <- mapM (bindTexture' ftxord) ftxs :: IO [(Texture, TextureObject)]
   itxTuples <- mapM (bindTexture' itxord) itxs :: IO [(Texture, TextureObject)]
 
-  objs'  <- mapM (toObject txTuples dms)   (preObjects    prj) --toObjects     initProject' txTuples  dms
+  objs'  <- mapM (toObject txTuples dms)   (concatMap flatten $ preObjects prj) --toObjects     initProject' txTuples  dms
+  --print $ "+++DEBUG+++" ++ show objs'
   fobjs' <- mapM (toObject ftxTuples fdms) (preFontObject prj) --toFontObjects initProject' ftxTuples fdms
   iobjs' <- mapM (toObject itxTuples idms) (preIconObject prj) --toFontObjects initProject' itxTuples idms
 
