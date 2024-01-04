@@ -124,7 +124,8 @@ executable ProjectViewer
                    , JuicyPixels
                    , keid-resource-gltf
                    , keid-core ==0.1.8.0
-                   , lens
+                   --, lens
+                   
                    , linear
                    , locators
                    , massiv
@@ -135,6 +136,7 @@ executable ProjectViewer
                    , text
                    , transformers
                    , microlens
+                   , microlens-th
                    , random
                    , rio
                    , split
@@ -163,6 +165,9 @@ executable ProjectViewer
                   , Graphics.RedViz.GLUtil.JuicyTextures
                   , Graphics.RedViz.GLUtil.Textures
                   , Graphics.RedViz.GLUtil.TypeMapping
+                  , Graphics.RedViz.GLTF
+                  , Graphics.RedViz.GLTF.Load
+                  , Graphics.RedViz.GLTF.Model
                   , Graphics.RedViz.LoadShaders
                   , Graphics.RedViz.Camera.Lens
                   , Graphics.RedViz.Drawable.Lens
