@@ -104,8 +104,7 @@ library
 
 executable ProjectViewer
     main-is:         ProjectViewer.hs
-    --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-unused-top-binds -Wno-orphans
-    --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans
+    --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
     ghc-options:    -threaded -O2
     build-depends:   base ^>=4.16.4.0

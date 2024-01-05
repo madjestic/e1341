@@ -2,45 +2,25 @@
 module Main where
 
 import SDL hiding (Texture, normalize)
-import Control.Monad (when)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.MSF as TMSF
 import Data.MonadicStreamFunction  
-import Data.Text (Text, unpack)
-import Foreign (sizeOf)  
 import Foreign.C.Types  
 import Unsafe.Coerce
 import Graphics.Rendering.OpenGL as GL hiding (Select, normalize)
-import Foreign.Ptr (plusPtr, nullPtr, Ptr)
-import Foreign.Marshal.Array (withArray)  
 import Lens.Micro
 import Lens.Micro.Extras
-import Data.Vector qualified as V hiding (head, length)
-import Data.Foldable as DF
-import Data.Word
 import GHC.Float
-import Data.StateVar as SV
-import Geomancy.Vec4 hiding (dot, normalize) 
-import Geomancy.Vec3 hiding (dot, normalize)
-import Geomancy.Vec2 hiding (dot, normalize)
-import Data.Coerce (coerce)
-import Data.UUID
-import Linear.Projection         as LP        (infinitePerspective)
 import Linear.Metric (normalize)
-import Data.Maybe (fromMaybe)
 import Data.Set as DS ( fromList, toList )
-import GHC.Generics
-import Data.UUID.V4
 
 import Graphics.RedViz.Backend
 import Graphics.RedViz.Camera
 import Graphics.RedViz.Descriptor
 import Graphics.RedViz.Drawable
 import Graphics.RedViz.Game
-import Graphics.RedViz.GLTF as Gltf
-import Graphics.RedViz.LoadShaders
 import Graphics.RedViz.Material as R
 import Graphics.RedViz.Object
 import Graphics.RedViz.Project
@@ -62,10 +42,10 @@ type Res   = (CInt, CInt)
 -- lookupObject :: Object -> UUID -> Object
 -- lookupObject obj0 uuid0 = obj0  
 
-runGame :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
-runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
+gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
+gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
   where
-    gameLoop = arrM (\_ -> (lift . lift) gameLoopDelay)
+    runGame  = arrM (\_ -> (lift . lift) gameLoopDelay)
     gameQuit = arrM (\_ -> (lift . lift . lift) gameQuit')
 
     gameQuit' :: StateT Game IO Bool
@@ -342,34 +322,34 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                                   t0 { tslvrs = updateController cam (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs t0}
 
                     camRoll :: Integer -> StateT Game IO ()
-                    camRoll n = undefined --modify $ camRoll'
+                    camRoll _ = undefined --modify $ camRoll'
                       where
-                        camRoll' :: Game -> Game
-                        camRoll' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
-                          where
-                            updateCam :: Camera -> Camera
-                            updateCam cam =
-                              cam { ctransform = updateSolvers (ctransform cam)}
-                              where
-                                updateSolvers :: Transformable -> Transformable
-                                updateSolvers t0 =
-                                  t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 (fromIntegral n) 0) <$> tslvrs t0}
+                        -- camRoll' :: Game -> Game
+                        -- camRoll' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
+                        --   where
+                        --     updateCam :: Camera -> Camera
+                        --     updateCam cam =
+                        --       cam { ctransform = updateSolvers (ctransform cam)}
+                        --       where
+                        --         updateSolvers :: Transformable -> Transformable
+                        --         updateSolvers t0 =
+                        --           t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 (fromIntegral n) 0) <$> tslvrs t0}
                           
-                    inc :: Integer -> StateT Game IO ()
-                    inc n = modify $ inc' n
-                      where
-                        inc' :: Integer -> Game -> Game
-                        inc' k g0 = g0 { uniforms = incUnis (tick g0 + k) (uniforms g0) }
-                          where
-                            incUnis :: Integer -> Uniforms -> Uniforms
-                            incUnis tick' unis0 = 
-                              unis0 { u_time = fromInteger tick' }
+                    -- inc :: Integer -> StateT Game IO ()
+                    -- inc n = modify $ inc' n
+                    --   where
+                    --     inc' :: Integer -> Game -> Game
+                    --     inc' k g0 = g0 { uniforms = incUnis (tick g0 + k) (uniforms g0) }
+                    --       where
+                    --         incUnis :: Integer -> Uniforms -> Uniforms
+                    --         incUnis tick' unis0 = 
+                    --           unis0 { u_time = fromInteger tick' }
                      
                     quitE :: Bool -> StateT Game IO ()
-                    quitE b' = modify $ quit' b'
+                    quitE b = modify $ quit' b
                       where
                         quit' :: Bool -> Game -> Game
-                        quit' b'' gameLoopDelay' = gameLoopDelay' { quitGame = b'' }         
+                        quit' b' gameLoopDelay' = gameLoopDelay' { quitGame = b' }         
               
 animate :: Window
         -> DTime
@@ -388,12 +368,12 @@ animate window dt gs g sf = do
 main :: IO ()
 main = do
   let
+    opts = initSettings
     (resX', resY') =
-      (\opts ->
-          ( unsafeCoerce $ fromIntegral $ resX opts
-          , unsafeCoerce $ fromIntegral $ resY opts))
-      initSettings
-  parentTestProject' <- setProjectUUID $ parentTestProject resX' resY'
+      ( unsafeCoerce $ resX opts
+      , unsafeCoerce $ resY opts ) :: (CInt, CInt)
+
+  parentTestProject' <- setProjectUUID $ parentTestProject (resX opts) (resY opts)
 
   let
     initProject'= parentTestProject'
@@ -416,15 +396,15 @@ main = do
   let -- this basically collects all the materials, reads textures from them and uniquely binds
     txs   = concatMap (\(_,m) -> R.textures m) $ concat dms
     uuids = fmap T.uuid txs
-    txord = DS.toList . DS.fromList $ zip uuids [0..] -- this guarantees unique texture (uuid) bindings
+    txord = DS.toList . DS.fromList $ zip uuids [0..]   -- this guarantees unique texture (uuid) bindings
 
     ftxs   = concatMap (\(_,m) -> R.textures m) $ concat fdms
     fuuids = fmap T.uuid ftxs
-    ftxord = DS.toList . DS.fromList $ zip fuuids [0..] -- this guarantees unique texture (uuid) bindings
+    ftxord = DS.toList . DS.fromList $ zip fuuids [0..] 
 
     itxs   = concatMap (\(_,m) -> R.textures m) $ concat idms
     iuuids = fmap T.uuid itxs
-    itxord = DS.toList . DS.fromList $ zip iuuids [0..] -- this guarantees unique texture (uuid) bindings
+    itxord = DS.toList . DS.fromList $ zip iuuids [0..] 
     prj    = initProject'
         
   putStrLn "Binding Textures..."
@@ -432,10 +412,9 @@ main = do
   ftxTuples <- mapM (bindTexture ftxord) ftxs :: IO [(Texture, TextureObject)]
   itxTuples <- mapM (bindTexture itxord) itxs :: IO [(Texture, TextureObject)]
 
-  objs'  <- mapM (toObject txTuples dms)   (concatMap flatten $ preObjects prj) --toObjects     initProject' txTuples  dms
-  --print $ "+++DEBUG+++" ++ show objs'
-  fobjs' <- mapM (toObject ftxTuples fdms) (preFontObject prj) --toFontObjects initProject' ftxTuples fdms
-  iobjs' <- mapM (toObject itxTuples idms) (preIconObject prj) --toFontObjects initProject' itxTuples idms
+  objs'  <- mapM (toObject txTuples  dms)  (concatMap flatten $ preObjects prj)
+  fobjs' <- mapM (toObject ftxTuples fdms) (preFontObject prj)
+  iobjs' <- mapM (toObject itxTuples idms) (preIconObject prj)
 
   animate
     window
@@ -467,8 +446,8 @@ main = do
           , format = Format
             {
               alignment = CC
-            , xres      = resX'
-            , yres      = resY'
+            , xres      = resX opts
+            , yres      = resY opts
             , xoffset   = 0.0
             , yoffset   = 0.0
             , zoffset   = 0.0
@@ -484,6 +463,6 @@ main = do
           }
         ]
       }
-    runGame
+    gameLoop
   
   putStrLn "Exiting Game"
