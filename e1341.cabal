@@ -23,8 +23,8 @@ source-repository head
 
 library 
   exposed-modules:
-      Load_glTF
-      Model_glTF 
+      --Load_glTF
+      --Model_glTF 
       --Scene_glTF 
   other-modules:
       --Paths_keid_resource_gltf
@@ -145,42 +145,41 @@ executable ProjectViewer
                    , uuid
                     
     other-modules:
-                    LoadShaders
-                  , Load_glTF
-                  , Model_glTF
-                  , Projects.Test                  
-                  , Graphics.RedViz.Material
-                  , Graphics.RedViz.Texture
-                  , Graphics.RedViz.Utils
-                  , Graphics.RedViz.Backend
-                  , Graphics.RedViz.Camera
-                  , Graphics.RedViz.Controllable
-                  , Graphics.RedViz.Descriptor
-                  , Graphics.RedViz.Drawable
-                  , Graphics.RedViz.Input.Keyboard
-                  , Graphics.RedViz.Input.Mouse
-                  , Graphics.RedViz.Object
-                  , Graphics.RedViz.Camera
-                  , Graphics.RedViz.GLUtil
-                  , Graphics.RedViz.GLUtil.JuicyTextures
-                  , Graphics.RedViz.GLUtil.Textures
-                  , Graphics.RedViz.GLUtil.TypeMapping
-                  , Graphics.RedViz.GLTF
-                  , Graphics.RedViz.GLTF.Load
-                  , Graphics.RedViz.GLTF.Model
-                  , Graphics.RedViz.LoadShaders
-                  , Graphics.RedViz.Camera.Lens
-                  , Graphics.RedViz.Drawable.Lens
-                  , Graphics.RedViz.Material.Lens
-                  , Graphics.RedViz.Object.Lens
-                  , Graphics.RedViz.Rendering
-                  , Graphics.RedViz.Texture.Lens
-                  , Graphics.RedViz.VAO
-                  , Graphics.RedViz.Widget
-                  , Graphics.RedViz.Project
-                  , Graphics.RedViz.Project.Model
-                  , Graphics.RedViz.Solvable
-                  , Graphics.RedViz.Transformable
+                     Projects.Test                  
+                   , Graphics.RedViz.Material
+                   , Graphics.RedViz.Texture
+                   , Graphics.RedViz.Utils
+                   , Graphics.RedViz.Backend
+                   , Graphics.RedViz.Camera
+                   , Graphics.RedViz.Controllable
+                   , Graphics.RedViz.Descriptor
+                   , Graphics.RedViz.Drawable
+                   , Graphics.RedViz.Input.Keyboard
+                   , Graphics.RedViz.Input.Mouse
+                   , Graphics.RedViz.Object
+                   , Graphics.RedViz.Camera
+                   , Graphics.RedViz.GLUtil
+                   , Graphics.RedViz.GLUtil.JuicyTextures
+                   , Graphics.RedViz.GLUtil.Textures
+                   , Graphics.RedViz.GLUtil.TypeMapping
+                   , Graphics.RedViz.GLTF
+                   , Graphics.RedViz.GLTF.Load
+                   , Graphics.RedViz.GLTF.Model
+                   , Graphics.RedViz.LoadShaders
+                   , Graphics.RedViz.Camera.Lens
+                   , Graphics.RedViz.Drawable.Lens
+                   , Graphics.RedViz.Material.Lens
+                   , Graphics.RedViz.Object.Lens
+                   , Graphics.RedViz.Rendering
+                   , Graphics.RedViz.Texture.Lens
+                   , Graphics.RedViz.VAO
+                   , Graphics.RedViz.Widget
+                   , Graphics.RedViz.Project
+                   , Graphics.RedViz.Project.Model
+                   , Graphics.RedViz.Solvable
+                   , Graphics.RedViz.Transformable
+                   , Graphics.RedViz.Game
+                   , Graphics.RedViz.Uniforms
                   
     hs-source-dirs:
                     app

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 module Main where
 
@@ -39,6 +38,7 @@ import Graphics.RedViz.Backend
 import Graphics.RedViz.Camera
 import Graphics.RedViz.Descriptor
 import Graphics.RedViz.Drawable
+import Graphics.RedViz.Game
 import Graphics.RedViz.GLTF as Gltf
 import Graphics.RedViz.LoadShaders
 import Graphics.RedViz.Material as R
@@ -49,132 +49,15 @@ import Graphics.RedViz.Solvable
 import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Transformable
 import Graphics.RedViz.Widget
+import Graphics.RedViz.Uniforms
 
 import Projects.Test
 
 --import Debug.Trace as DT
 
 type DTime = Double
-    
-toObject :: [(Texture, TextureObject)] -> [[(Descriptor, R.Material)]]-> PreObject -> IO Object
-toObject txTuples' dms' pobj = do
-  --print $ (options pobj)
-  let
-    dms      = (dms'!!) <$> modelIDXs pobj
-    txs      = concatMap (\(_,m) -> R.textures m) $ concat dms :: [Texture]
-    txTuples = filter (\(tx,_) -> tx `elem` txs) txTuples'     :: [(Texture, TextureObject)]
-    drs =
-      toDrawable
-      (identity :: M44 Double) -- TODO: add result based on solvers composition
-      (options pobj)
-      txTuples
-      <$> concat dms
-      :: [Drawable]
-    
-    obj =
-      Object
-      { transform = defaultTransformable {tslvrs = tsolvers pobj}
-      , drws      = drs
-      , oslvrs    = osolvers pobj
-      , selected  = False
-      , uuid      = puuid   pobj
-      , parent    = pparent pobj
-      }
-
-  return obj
-
-data Game = Game
-  { tick     :: Integer
-  , mpos     :: Point V2 CInt
-  , quitGame :: Bool
-  , cameras  :: [Camera]
-  , uniforms :: Uniforms
-  , objs     :: [Object]
-  , wgts     :: [Widget]
-  } deriving Show
-
-data GameSettings = GameSettings
-  { resX :: Int 
-  , resY :: Int 
-  } deriving Show
-
-initGame :: Game
-initGame =
-  Game
-  { tick     = -1
-  , mpos     = P (V2 0 0)
-  , quitGame = False
-  , cameras  = [defaultCam]
-  , uniforms = defaultUniforms
-  , objs     = []
-  , wgts     = []
-  }
-
-initSettings :: GameSettings
-initSettings = GameSettings
-  { resX = 1280
-  , resY = 720 }
-
-type Time = Double
-type Res  = (CInt, CInt)
-
-unzipWith :: Eq a => [a] -> [(a,b)] -> [(a,b)]
-unzipWith xs xys = xys'
-  where
-    xys' = filter (\xy -> fst xy `elem` xs) xys
-
-toDrawable
-  :: M44 Double
-  -> BackendOptions
-  -> [(Texture, TextureObject)]
-  -> (Descriptor, R.Material)
-  -> Drawable
-toDrawable xform' opts txos (d, mat') = dr
-  where
-    txs'   = R.textures mat'
-    txos'  = zip [0..] $ unzipWith txs' txos :: [(Int, (Texture, TextureObject))] 
-    dr =
-      Drawable
-      { 
-        u_xform    = xform'
-      , descriptor = d
-      , material   = mat'
-      , dtxs       = txos'
-      , doptions   = opts
-      }
-
-setProjectUUID :: Project -> IO Project
-setProjectUUID prj0 = do
-  pobjs' <- mapM setUUID (preObjects prj0)
-  return prj0 { preObjects = pobjs' }
-
-setUUID :: PreObject -> IO PreObject
-setUUID pobj0@(PreObject{pchildren = []}) = do
-  genUUID  <- nextRandom :: IO UUID
-  return pobj0 { puuid = genUUID }
-setUUID pobj0@(PreObject{pchildren = [p]}) = do
-  genUUID  <- nextRandom :: IO UUID
-  genUUID' <- nextRandom :: IO UUID
-  return pobj0 { puuid     = genUUID
-               , pchildren = [p { pparent = genUUID
-                                , puuid   = genUUID'}] }
-setUUID pobj0@(PreObject{pchildren = (p:ps)}) = do
-  genUUID  <- nextRandom :: IO UUID
-  p'  <- setUUID p --(p{pparent = genUUID})
-  ps' <- mapM setUUID ps
-  return pobj0 { puuid     = genUUID 
-               , pchildren = p':ps' }
-
-flatten :: PreObject -> [PreObject]
-flatten pobj0@(PreObject{pchildren = []})     = [childFree pobj0]
-flatten pobj0@(PreObject{pchildren = [p]})    = childFree pobj0 : flatten p
-flatten pobj0@(PreObject{pchildren = (p:ps)}) = childFree pobj0 : concat (flatten p : (flatten <$> ps))
-
-childFree :: PreObject -> PreObject
-childFree pobj0 = (pobj0{pchildren = []})
-
---testPreObject' <- setUUID testPreObject
---flatten testPreObject'
+type Time  = Double
+type Res   = (CInt, CInt)
 
 -- lookupObject :: Object -> UUID -> Object
 -- lookupObject obj0 uuid0 = obj0  
@@ -487,129 +370,7 @@ runGame = gameLoop `untilMaybe` gameQuit `catchMaybe` exit
                       where
                         quit' :: Bool -> Game -> Game
                         quit' b'' gameLoopDelay' = gameLoopDelay' { quitGame = b'' }         
-  
--- < Rendering > ----------------------------------------------------------
-openWindow :: Text -> (CInt, CInt) -> IO SDL.Window
-openWindow title (sizex,sizey) = do
-    SDL.initialize [SDL.InitVideo]
-    SDL.HintRenderScaleQuality $= SDL.ScaleLinear                    
-    do renderQuality <- SDL.get SDL.HintRenderScaleQuality          
-       when (renderQuality /= SDL.ScaleLinear) $                    
-         putStrLn "Warning: Linear texture filtering not enabled!"
-
-    let config = 
-          OpenGLConfig { glColorPrecision     = V4 8 8 8 0
-                       , glDepthPrecision     = 24
-                       , glStencilPrecision   = 8
-                       , glMultisampleSamples = 4
-                       , glProfile            = Core Normal 4 5
-                       }
-     
-    window <- SDL.createWindow
-              title
-              SDL.defaultWindow
-              { SDL.windowInitialSize     = V2 sizex sizey
-              , SDL.windowGraphicsContext = OpenGLContext config }
-
-    SDL.showWindow window
-    _ <- SDL.glCreateContext window
-    
-    return window
-
-
-toDescriptorMat :: FilePath -> IO [(Descriptor, R.Material)]
-toDescriptorMat file = do
-  (stuff, mats) <- loadGltf file -- "models/pighead.gltf"
-  mats' <- mapM fromGltfMat mats
-  print mats'
-  ds    <- mapM (\((vs, idx), mat) -> initResources idx vs mat) $ zip (concat stuff) mats'
-  return $ zip ds mats'
-
-initResources :: [GLfloat] -> [GLenum] -> R.Material -> IO Descriptor
-initResources vs idx mat =  
-  do
-    -- print $ mat
-    -- | VAO
-    triangles <- genObjectName
-    bindVertexArrayObject $= Just triangles
-
-    -- | VBO
-    vertexBuffer <- genObjectName
-    bindBuffer ArrayBuffer $= Just vertexBuffer
-    let numVertices = length vs
-    withArray vs $ \ptr ->
-      do
-        let sizev = fromIntegral (numVertices * sizeOf (head vs))
-        bufferData ArrayBuffer $= (sizev, ptr, StaticDraw)
-
-    -- | EBO
-    elementBuffer <- genObjectName
-    bindBuffer ElementArrayBuffer $= Just elementBuffer
-    let numIndices = length idx
-    withArray idx $ \ptr ->
-      do
-        let indexSize = fromIntegral $ numIndices * sizeOf (0 :: GLenum)
-        bufferData ElementArrayBuffer $= (indexSize, ptr, StaticDraw)
-        
-    -- | Bind the pointer to the vertex attribute data
-    let floatSize  = (fromIntegral $ sizeOf (0.0::GLfloat)) :: GLsizei
-        stride     = 8 * floatSize
-
-    -- | Positions
-    let vPosition = AttribLocation 0
-        posOffset = 0 * floatSize
-    vertexAttribPointer vPosition $=
-        (ToFloat, VertexArrayDescriptor 3 Float stride (bufferOffset posOffset))
-    vertexAttribArray vPosition   $= Enabled
-
-    -- | Colors
-    let vaRGBA     = AttribLocation 1
-        rgbaOffset = 3 * floatSize
-    vertexAttribPointer vaRGBA  $=
-        (ToFloat, VertexArrayDescriptor 4 Float stride (bufferOffset rgbaOffset))
-    vertexAttribArray vaRGBA    $= Enabled
-
-    -- | UV
-    let uvCoords = AttribLocation 2
-        uvOffset = 6 * floatSize
-    vertexAttribPointer uvCoords  $=
-        (ToFloat, VertexArrayDescriptor 2 Float stride (bufferOffset uvOffset))
-    vertexAttribArray uvCoords    $= Enabled
-
-    -- || Shaders
-    -- print $ "mat : " ++ show mat
-    program <- loadShaders [
-        ShaderInfo VertexShader   (FileSource $ vertShader mat),
-        ShaderInfo FragmentShader (FileSource $ fragShader mat)]
-    currentProgram $= Just program
-
-    -- || Unload buffers
-    bindVertexArrayObject         $= Nothing
-
-    return $ Descriptor triangles (fromIntegral numIndices) program
-
-bufferOffset :: Integral a => a -> Ptr b
-bufferOffset = plusPtr nullPtr . fromIntegral
-  
-renderOutput :: Window -> GameSettings -> (Game, Maybe Bool) -> IO Bool
-renderOutput _ _ ( _,Nothing) = quit >> return True
-
-renderOutput window gs (g,_) = do
-  let
-  clearColor $= Color4 0.0 0.0 0.0 1.0
-  GL.clear [ColorBuffer, DepthBuffer]
-
-  GL.pointSize $= 10.0
-  GL.blend $= Enabled
-  GL.depthMask $= Enabled
-  depthFunc $= Just Less
-  cullFace  $= Just Back
-
-  mapM_ (renderObject (head $ cameras g) (uniforms g)) (objs g)
-  mapM_ (renderWidget (head $ cameras g) (uniforms g)) (wgts g)
-
-  glSwapWindow window >> return False  
-            
+              
 animate :: Window
         -> DTime
         -> GameSettings
