@@ -35,24 +35,20 @@ import Projects.Test
 
 --import Debug.Trace as DT
 
-type DTime = Double
-type Time  = Double
-type Res   = (CInt, CInt)
-
 -- lookupObject :: Object -> UUID -> Object
 -- lookupObject obj0 uuid0 = obj0  
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
   where
-    runGame  = arrM (\_ -> (lift . lift) gameLoopDelay)
+    runGame  = arrM (\_ -> (lift . lift) gameLoopStep)
     gameQuit = arrM (\_ -> (lift . lift . lift) gameQuit')
 
     gameQuit' :: StateT Game IO Bool
     gameQuit' = TMSF.get >>= \s -> return $ quitGame s
 
-    gameLoopDelay :: ReaderT Double (StateT Game IO) Bool
-    gameLoopDelay = do
+    gameLoopStep :: ReaderT Double (StateT Game IO) Bool
+    gameLoopStep = do
       TMSF.ask >>= \r ->  liftIO $ delay $ fromIntegral(double2Int $ r * 100)
       lift updateGame
 
@@ -323,17 +319,17 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                     camRoll :: Integer -> StateT Game IO ()
                     camRoll _ = undefined --modify $ camRoll'
-                      where
-                        -- camRoll' :: Game -> Game
-                        -- camRoll' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
-                        --   where
-                        --     updateCam :: Camera -> Camera
-                        --     updateCam cam =
-                        --       cam { ctransform = updateSolvers (ctransform cam)}
-                        --       where
-                        --         updateSolvers :: Transformable -> Transformable
-                        --         updateSolvers t0 =
-                        --           t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 (fromIntegral n) 0) <$> tslvrs t0}
+                      -- where
+                      --   camRoll' :: Game -> Game
+                      --   camRoll' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
+                      --     where
+                      --       updateCam :: Camera -> Camera
+                      --       updateCam cam =
+                      --         cam { ctransform = updateSolvers (ctransform cam)}
+                      --         where
+                      --           updateSolvers :: Transformable -> Transformable
+                      --           updateSolvers t0 =
+                      --             t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 (fromIntegral n) 0) <$> tslvrs t0}
                           
                     -- inc :: Integer -> StateT Game IO ()
                     -- inc n = modify $ inc' n
@@ -350,7 +346,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       where
                         quit' :: Bool -> Game -> Game
                         quit' b' gameLoopDelay' = gameLoopDelay' { quitGame = b' }         
-              
+
+type DTime = Double
+
 animate :: Window
         -> DTime
         -> GameSettings
