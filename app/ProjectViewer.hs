@@ -35,9 +35,6 @@ import Projects.Test
 
 --import Debug.Trace as DT
 
--- lookupObject :: Object -> UUID -> Object
--- lookupObject obj0 uuid0 = obj0  
-
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
   where
@@ -118,6 +115,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                       tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
                   Parent -> identity -- TODO: add inheriting transform from sertParent object
+                  ParentToPlayer -> identity -- TODO: add inheriting transform to current camera
                   _ -> identity
 
           updateCameras :: StateT Game IO ()
@@ -371,13 +369,12 @@ main = do
       ( unsafeCoerce $ resX opts
       , unsafeCoerce $ resY opts ) :: (CInt, CInt)
 
-  parentTestProject' <- setProjectUUID $ parentTestProject (resX opts) (resY opts)
+  initProject <- setProjectUUID $ raymarchProject (resX opts) (resY opts)
 
   let
-    initProject'= parentTestProject'
-    models'     = models     initProject' :: [FilePath]
-    fonts'      = fontModels initProject' :: [FilePath]
-    icons'      = iconModels initProject' :: [FilePath]    
+    models'     = models     initProject :: [FilePath]
+    fonts'      = fontModels initProject :: [FilePath]
+    icons'      = iconModels initProject :: [FilePath]    
 
   initializeAll
   window <- openWindow "Mandelbrot + SDL2/OpenGL" (resX', resY')
@@ -403,7 +400,7 @@ main = do
     itxs   = concatMap (\(_,m) -> R.textures m) $ concat idms
     iuuids = fmap T.uuid itxs
     itxord = DS.toList . DS.fromList $ zip iuuids [0..] 
-    prj    = initProject'
+    prj    = initProject
         
   putStrLn "Binding Textures..."
   txTuples  <- mapM (bindTexture  txord) txs  :: IO [(Texture, TextureObject)]
