@@ -369,7 +369,7 @@ main = do
       ( unsafeCoerce $ resX opts
       , unsafeCoerce $ resY opts ) :: (CInt, CInt)
 
-  initProject <- setProjectUUID $ raymarchProject (resX opts) (resY opts)
+  initProject <- setProjectUUID $ testProject (resX opts) (resY opts)
 
   let
     models'     = models     initProject :: [FilePath]
