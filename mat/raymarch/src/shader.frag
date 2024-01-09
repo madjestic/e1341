@@ -153,29 +153,46 @@ vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 e
     return color;
 }
 
+mat4 viewMatrix(vec3 eye, vec3 center, vec3 up) {
+    // Based on gluLookAt man page
+    vec3 f = normalize(center - eye);
+    vec3 s = normalize(cross(f, up));
+    vec3 u = cross(s, f);
+    return mat4(
+        vec4(s, 0.0),
+        vec4(u, 0.0),
+        vec4(-f, 0.0),
+        vec4(0.0, 0.0, 0.0, 1)
+    );
+}
+
 void main()
 {
-
   mat3 viewRot =
 	  mat3( camera[0].xyz
 		  , -camera[1].xyz
 		  , camera[2].xyz );
 	
-  vec3 dir   = rayDirection(45.0, u_resolution.xy, fragCoord);
-  dir *= viewRot;
-  vec3 eye   = (camera)[3].xyz;
-  float dist = shortestDistanceToSurface(eye, dir, MIN_DIST, MAX_DIST);
+  vec3 viewDir	  = rayDirection(45.0, u_resolution.xy, fragCoord);
+  //viewDir *= inverse(viewRot);
+  vec3 eye	  = (camera)[3].xyz;
+  //vec3 eye = vec3(0,0,5);
+  //eye	*= inverse(viewRot);
+  //mat4 viewToWorld = viewMatrix(eye, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+  mat4 viewToWorld = viewMatrix(eye, xform[3].xyz, vec3(0.0, 1.0, 0.0));
+  //vec3 worldDir = (viewToWorld * vec4(viewDir, 0.0)).xyz;
+  vec3 worldDir = (inverse(camera) * vec4(viewDir, 0.0)).xyz;
+  
+  float dist = shortestDistanceToSurface(eye, worldDir, MIN_DIST, MAX_DIST);
 
   if (dist > MAX_DIST - EPSILON) {
-      // Didn't hit anything
-      fragColor = vec4(0.0, 0.0, 0.0, 0.0);
+	   // Didn't hit anything
+	   fragColor = vec4(0.0, 0.0, 0.0, 0.0);
 	  return;
   }
-    
-  //fragColor = vec4(1.0, 0.0, 0.0, 1.0);
-  //fragColor = vec4(dir, 1.0);
+  
   //The closest point on the surface to the eyepoint along the view ray
-  vec3 p = eye + dist * dir;
+  vec3 p = eye + dist * worldDir;
   
   vec3 K_a = vec3(0.2, 0.2, 0.2);
   vec3 K_d = vec3(0.7, 0.2, 0.2);

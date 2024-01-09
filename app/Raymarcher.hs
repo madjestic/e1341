@@ -18,7 +18,7 @@ import Linear.Metric (normalize)
 import Data.Set as DS ( fromList, toList )
 
 import Graphics.RedViz.Backend
-import Graphics.RedViz.Camera
+import Graphics.RedViz.Camera (Camera(..), defaultCamSolver)
 import Graphics.RedViz.Descriptor
 import Graphics.RedViz.Drawable
 import Graphics.RedViz.Game
@@ -113,16 +113,16 @@ raymarchProject resx' resy' =
       , pchildren  = []
       }
     ]
-  , pcameras    = [ projectCam ]
+  , pcameras    = [ defaultCam ]
   }
 
-projectCam :: Camera
-projectCam =
+defaultCam :: Camera
+defaultCam =
   Camera
   {
     name       = "PlayerCamera"
   , apt        = 50.0
-  , foc        = 100.0
+  , foc        = 50.0
   , ctransform = projectCamTransformable { tslvrs = [defaultCamSolver]}
   , mouseS     = -0.0025
   , keyboardRS = 0.05
@@ -139,7 +139,7 @@ projectCamTransformable =
       (V4
         (V4 1 0 0 0)    -- <- . . . x ...
         (V4 0 1 0 0)    -- <- . . . y ...
-        (V4 0 0 1 3)   -- <- . . . z-component of transform
+        (V4 0 0 1 5)   -- <- . . . z-component of transform
         (V4 0 0 0 1))
   , tslvrs = [Identity]
   }
@@ -157,13 +157,15 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
     gameLoopStep :: ReaderT Double (StateT Game IO) Bool
     gameLoopStep = do
       TMSF.ask >>= \r ->  liftIO $ delay $ fromIntegral(double2Int $ r * 100)
-      lift updateGame
+      --lift updateGame
+      TMSF.ask >>= \r -> lift $ updateGame r
 
-    updateGame :: StateT Game IO Bool
-    updateGame = do
+    updateGame :: Double -> StateT Game IO Bool
+    updateGame r = do
       updateObjects
       updateWidgets
       updateCameras
+      updateTick r
       handleEvents
         where
           solveTransformable :: Transformable -> Transformable
@@ -439,22 +441,24 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       --           updateSolvers :: Transformable -> Transformable
                       --           updateSolvers t0 =
                       --             t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 (fromIntegral n) 0) <$> tslvrs t0}
-                          
-                    -- inc :: Integer -> StateT Game IO ()
-                    -- inc n = modify $ inc' n
-                    --   where
-                    --     inc' :: Integer -> Game -> Game
-                    --     inc' k g0 = g0 { uniforms = incUnis (tick g0 + k) (uniforms g0) }
-                    --       where
-                    --         incUnis :: Integer -> Uniforms -> Uniforms
-                    --         incUnis tick' unis0 = 
-                    --           unis0 { u_time = fromInteger tick' }
-                     
+                                               
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b
                       where
                         quit' :: Bool -> Game -> Game
-                        quit' b' gameLoopDelay' = gameLoopDelay' { quitGame = b' }         
+                        quit' b' gameLoopDelay' = gameLoopDelay' { quitGame = b' }
+
+          updateTick :: Double -> StateT Game IO ()
+          updateTick n = modify $ inc'
+            where
+              inc' :: Game -> Game
+              inc' g0 = g0
+                { tick = tick g0 + n 
+                , uniforms = incUnis (uniforms g0) }
+                where
+                  incUnis :: Uniforms -> Uniforms
+                  incUnis unis0 = 
+                    unis0 { u_time = tick g0 }
 
 type DTime = Double
 
@@ -524,8 +528,8 @@ main = do
 
   animate
     window
-    --(1.0/60.0 :: Double) -- 60 fps?
-    (60.0/60.0 :: Double) -- 60 fps?
+    (1.0/60.0 :: Double) -- 60 fps?
+    --(60.0/60.0 :: Double) -- 60 fps?
     initSettings
     initGame
       { 

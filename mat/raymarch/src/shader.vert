@@ -48,7 +48,8 @@ void main()
 		mat4 ( vec4 (1,0,0,0)
 		     , vec4 (0,1,0,0)
 		     , vec4 (0,0,1,0)
-			 , vec4 (0,0,xform[3][2],1)
+			 //, vec4 (0,0,xform[3][2],1)
+			 , vec4 (0,0,-3,1)
 			);
 
 	vec4 position = vec4(vPosition,1.0);	

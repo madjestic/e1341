@@ -141,8 +141,7 @@ executable ProjectViewer
                    , uuid
                     
     other-modules:
-                     Projects.Test
-                   , Graphics.RedViz.Material
+                     Graphics.RedViz.Material
                    , Graphics.RedViz.Texture
                    , Graphics.RedViz.Utils
                    , Graphics.RedViz.Backend
@@ -241,8 +240,7 @@ executable TestProject
                    , uuid
                     
     other-modules:
-                     Projects.Test
-                   , Graphics.RedViz.Material
+                     Graphics.RedViz.Material
                    , Graphics.RedViz.Texture
                    , Graphics.RedViz.Utils
                    , Graphics.RedViz.Backend
@@ -303,7 +301,7 @@ executable Raymarcher
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
     ghc-options:    -threaded -O2
-    --cpp-options:    -DDEBUGSHADERS
+    cpp-options:    -DDEBUGSHADERS
     build-depends:   base ^>=4.16.4.0
                    , aeson
                    , aeson-pretty
@@ -341,8 +339,7 @@ executable Raymarcher
                    , uuid
                     
     other-modules:
-                     Projects.Raymarcher                 
-                   , Graphics.RedViz.Material
+                     Graphics.RedViz.Material
                    , Graphics.RedViz.Texture
                    , Graphics.RedViz.Utils
                    , Graphics.RedViz.Backend
