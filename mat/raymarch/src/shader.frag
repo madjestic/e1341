@@ -54,10 +54,17 @@ float cubeSDF(vec3 p) {
     return insideDistance + outsideDistance;
 }
 
+vec3 noise (in vec3 p, float freq, float scale)
+{
+  float displacement = sin(freq * p.x) * sin(freq * p.y) * sin(freq * p.z) * scale;
+  return p *= displacement;
+}
+
 float sceneSDF(vec3 samplePoint)
 {
     //return sphereSDF(samplePoint);
 	//return cubeSDF(samplePoint);
+   samplePoint += noise(samplePoint, 10,0.1 * sin(u_time));
    float sphereDist = sphereSDF(samplePoint / 1.2) * 1.2;
    float cubeDist = cubeSDF(samplePoint);
    return intersectSDF(cubeDist, sphereDist);
@@ -68,7 +75,8 @@ float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, f
 {
     float depth = start;
     for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
-        float dist = sceneSDF(eye + depth * marchingDirection);
+        //float dist = sceneSDF(eye + depth * marchingDirection);
+		float dist = sceneSDF(eye + depth * marchingDirection);
         if (dist < EPSILON) {
 			return depth;
         }
@@ -79,11 +87,6 @@ float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, f
     }
     return end;
 }
-
-// vec2 normalize2D(vec2 v)
-// {
-// 	return vec2(v.x/(v.x*2))
-// }
 
 vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord)
 {
@@ -153,34 +156,10 @@ vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 e
     return color;
 }
 
-mat4 viewMatrix(vec3 eye, vec3 center, vec3 up) {
-    // Based on gluLookAt man page
-    vec3 f = normalize(center - eye);
-    vec3 s = normalize(cross(f, up));
-    vec3 u = cross(s, f);
-    return mat4(
-        vec4(s, 0.0),
-        vec4(u, 0.0),
-        vec4(-f, 0.0),
-        vec4(0.0, 0.0, 0.0, 1)
-    );
-}
-
 void main()
 {
-  mat3 viewRot =
-	  mat3( camera[0].xyz
-		  , -camera[1].xyz
-		  , camera[2].xyz );
-	
-  vec3 viewDir	  = rayDirection(45.0, u_resolution.xy, fragCoord);
-  //viewDir *= inverse(viewRot);
-  vec3 eye	  = (camera)[3].xyz;
-  //vec3 eye = vec3(0,0,5);
-  //eye	*= inverse(viewRot);
-  //mat4 viewToWorld = viewMatrix(eye, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
-  mat4 viewToWorld = viewMatrix(eye, xform[3].xyz, vec3(0.0, 1.0, 0.0));
-  //vec3 worldDir = (viewToWorld * vec4(viewDir, 0.0)).xyz;
+  vec3 viewDir	= rayDirection(45.0, u_resolution.xy, fragCoord);
+  vec3 eye	    = (camera)[3].xyz;
   vec3 worldDir = (inverse(camera) * vec4(viewDir, 0.0)).xyz;
   
   float dist = shortestDistanceToSurface(eye, worldDir, MIN_DIST, MAX_DIST);
@@ -193,6 +172,7 @@ void main()
   
   //The closest point on the surface to the eyepoint along the view ray
   vec3 p = eye + dist * worldDir;
+  //p = noise(p, 10,1);
   
   vec3 K_a = vec3(0.2, 0.2, 0.2);
   vec3 K_d = vec3(0.7, 0.2, 0.2);
@@ -203,16 +183,7 @@ void main()
   
   fragColor = vec4(color, 1.0);	 
   
-  //fragColor = vec4(camera[2].xyz, 1.0);
-  
   //vec2 uv       = fragCoord;
   //vec4 font_clr = texture(checkerboard, vec2(uv.x, uv.y));
-  //fragColor     = font_clr;
   //fragColor = vec4( 1.0f, 0.0f, 0.0f, 1.0f );
-	
-  // fragColor = vec4( Cd.x, Cd.y, Cd.z, A );
-  // fragColor = vec4( 0.0, Cd.y, Cd.z, A );
-  // fragColor = vec4( shaded_color, 1.0 );
-  // fragColor = vec4( ro, 1.0 );
-	
 }
