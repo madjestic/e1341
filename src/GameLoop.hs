@@ -24,6 +24,8 @@ import Graphics.RedViz.Transformable
 import Graphics.RedViz.Uniforms
 import Graphics.RedViz.Widget
 
+--import Debug.Trace as DT
+
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
   where
@@ -59,7 +61,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       where
                         solveTransformable :: Transformable -> Transformable
                         solveTransformable t0 =
-                          --DT.trace ("xform : " ++ show (xform t0))
                           t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
                              , tslvrs = updateSolver <$> tslvrs t0 }
                           where
@@ -67,16 +68,16 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateSolver slv =
                               case slv of
                                 Identity                  -> slv
-                                --Movable  _ pos  vel  ss -> slv { txyz   = pos  + vel  `applySolver` s
-                                Movable  _ pos  vel  ss -> slv { txyz   = pos  + foldr (applySolver Identity) vel  ss
+                                --Movable  _ pos  vel  ss -> slv { txyz   = pos  + vel  `updateVel` s
+                                Movable  _ pos  vel  ss -> slv { txyz   = pos  + foldr (updateVel Identity) vel  ss
                                                                  , kinslv = updateSolver <$> ss }
-                                Turnable _ _ _ rxyz avel ss -> slv { rxyz   = rxyz + foldr (applySolver Identity) avel ss
+                                Turnable _ _ _ rxyz avel ss -> slv { rxyz   = rxyz + foldr (updateVel Identity) avel ss
                                                                 , kinslv  = updateSolver <$> ss }
                                 Fadable l a inc _ _         -> slv { age    = min (a + inc) l}
                                 _ -> slv
                                 
-                            applySolver :: Solvable -> Solvable -> V3 Double -> V3 Double
-                            applySolver _ slv1 v0 =
+                            updateVel :: Solvable -> Solvable -> V3 Double -> V3 Double
+                            updateVel _ slv1 v0 =
                               case slv1 of
                                 Fadable l a _ amp f -> amp * f (l-a) *^ v0
                                 _ -> v0
@@ -157,50 +158,50 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     obj0 { transform = solveTransformable (transform obj0)
                          , selected  = lookedAt (head $ cameras g0) (xform (transform obj0)^.translation) 0.1 }
                     where
+                      (<>) :: Solvable -> Solvable -> Solvable
+                      (<>) slv0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = slv0 { tvel = amp * f (l-a) *^ v0 }
+                      (<>) slv0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = slv0 { avel = amp * f (l-a) *^ av0 }
+                      (<>) slv0@(Movable _ _ v0 _)       (Attractable _ a)     = slv0 { tvel = v0 + a * 0 }  -- a*dt?
+                      (<>) slv0 _ = slv0
+
                       solveTransformable :: Transformable -> Transformable
                       solveTransformable t0 =
-                        --DT.trace ("xform : " ++ show (xform t0))
                         t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
                            , tslvrs = updateSolver <$> tslvrs t0 }
                         where
                           updateSolver :: Solvable -> Solvable
                           updateSolver slv =
                             case slv of
-                              Identity                  -> slv
-                              Movable _ pos vel ss ->
-                                slv { txyz   = pos  + foldr (applySolver slv) vel  ss
+                              Identity             -> slv
+                              Movable _ pos _ ss   ->
+                                slv { txyz   = pos  + tvel (foldl (<>) slv (ss ++ (tslvrs.transform $ obj0)))
                                     , kinslv = updateSolver <$> ss}
-                              Turnable _ _ _ rxyz avel ss ->
-                                slv { rxyz   = rxyz + foldr (applySolver slv) avel ss
+                              Turnable _ _ _ rxyz _ ss ->
+                                slv { rxyz   = rxyz + avel (foldr (<>) slv (ss ++ (tslvrs.transform $ obj0)))
                                     , kinslv  = updateSolver <$> ss }
                               Fadable l a inc _ _ ->
                                 slv { age    = min (a + inc) l}
-                              Pullable m0 _  -> slv { acc = gravity }
+                              Attractable m0 _ -> slv { acc = gravity }
                                 where 
                                   gravity :: V3 Double
                                   gravity = 
                                     foldr (attract obj0) (V3 0 0 0) (filter (\obj' -> O.uuid obj' /= O.uuid obj0) $ objs g0)
                                     where
                                       attract :: Object -> Object -> V3 Double -> V3 Double
-                                      attract obj0 obj1 acc0 = acc0 + acc
+                                      attract obj0 obj1 acc0 = acc0 + acc'
                                         where
-                                          Pullable m1 _  = head ([ x | x@(Pullable _ _ ) <- tslvrs (transform obj1) ])
+                                          Attractable m1 _  = head ([ x | x@(Attractable _ _ ) <- tslvrs (transform obj1) ])
                                           p0   = (xform.transform $ obj0)^.translation
                                           p1   = (xform.transform $ obj1)^.translation
                                           dir  = p1 ^-^ p0                 :: V3 Double
                                           dist = norm dir                  :: Double
                                           g    = 6.673**(-11.0)            :: Double
                                           f    = g * m0 * m1 / dist**2.0   :: Double
-                                          acc  = (f / m0) *^ (dir ^/ dist) :: V3 Double
+                                          acc' = (f / m0) *^ (dir ^/ dist)
                                         -- | F = G*@mass*m2/(dist^2);       // Newton's attract equation
                                         -- | a += (F/@mass)*normalize(dir); // Acceleration
 
-                              _ -> slv
-                              
-                          applySolver :: Solvable -> Solvable -> V3 Double -> V3 Double
-                          applySolver _     (Fadable l a _ amp f) v0 = amp * f (l-a) *^ v0
-                          applySolver (Movable {}) (Pullable _ a) v0 = v0 + a -- a*dt?
-                          applySolver _ _ v0 = v0
+                              _ -> slv                                                        
                        
                           solveXform :: M44 Double -> Solvable -> M44 Double
                           solveXform mtx0 slv =
@@ -238,7 +239,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                                   tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
-                              Pullable mass acc -> identity -- & translation .~ pos
+                              Attractable mass acc -> identity & translation .~ V3 0 0 0.1 -- acc -- identity -- & translation .~ pos
                               Parentable -> identity -- TODO: add inheriting transform from sertParent object
                               ParentableToPlayer -> identity -- TODO: add inheriting transform to current camera
                               _ -> identity
@@ -425,3 +426,56 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   incUnis :: Uniforms -> Uniforms
                   incUnis unis0 = 
                     unis0 { u_time = tick g0 }
+
+stepOnce :: State Game ()
+stepOnce = modify gameObjects
+  where
+    gameObjects :: Game -> Game
+    gameObjects g0 = g0 { objs = updateObject <$> objs g0 }
+      where
+        updateObject :: Object -> Object
+        updateObject obj0 =
+          obj0 { transform = solveTransformable (transform obj0) }
+          where
+            solveTransformable :: Transformable -> Transformable
+            solveTransformable t0 =
+              t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
+                 , tslvrs = updateSolver <$> tslvrs t0 }
+              where
+                updateSolver :: Solvable -> Solvable
+                updateSolver slv =
+                  case slv of
+                    Identity             -> slv
+                    Movable _ pos _ ss   ->
+                      slv { txyz   = pos }
+                    Turnable _ _ _ rxyz _ ss ->
+                      slv { rxyz   = rxyz }
+                    _ -> slv                                                        
+             
+                solveXform :: M44 Double -> Solvable -> M44 Double
+                solveXform mtx0 slv =
+                  case slv of
+                    Identity -> identity
+                    Movable cs pos _ _ ->
+                      case cs of
+                        WorldSpace  -> identity & translation .~ pos
+                        ObjectSpace -> undefined
+                    Turnable _ _ rord rxyz _ _ -> transform' identity
+                      where
+                        transform' :: M44 Double -> M44 Double
+                        transform' mtx0' = mtx
+                          where
+                            mtx =
+                              mkTransformationMat
+                              rot
+                              tr
+                              where
+                                rot    = 
+                                  identity !*!
+                                  case rord of
+                                    XYZ ->
+                                          fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (rxyz^._x)) -- pitch
+                                      !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (rxyz^._y)) -- yaw
+                                      !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
+                                tr     = (identity::M44 Double)^.translation
+                    _ -> identity

@@ -47,6 +47,7 @@ initProject resx' resy' =
     [ "models/pighead.gltf"
     , "models/grid.gltf"
     , "models/adder_mk1.gltf"
+    , "models/planet.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -57,44 +58,49 @@ initProject resx' resy' =
   , preObjects = 
     [ PreObject
       {
-        pname          = "test_object"
+        pname          = "spaceship"
       , ptype          = Default
       , pidx           = 0
       , puuid          = nil
       , modelIDXs      = [2]
       , tsolvers       =
         [ Identity
-        -- , Rotate
-        --   { space = ObjectSpace
-        --   , cxyz  = V3 0 0 0
-        --   , rord  = XYZ
-        --   , rxyz  = V3 0 0 (0.5)
-        --   , avel  = V3 0 0 0.05 }
-        -- , Translate
-        --   { space   = WorldSpace
-        --   , txyz    = V3 1.5 0 0
-        --   , tvel    = V3 0.0 0 0
-        --   , kinslv  = Identity }
-        --   , Rotate
-        --   { space   = ObjectSpace
-        --   , cxyz    = V3 0 0 0
-        --   , rord    = XYZ
-        --   , rxyz    = V3 0 0 (0.5)
-        --   , avel    = V3 0 0 (0.1)
-        --   , kinslv =
-        --     Speed
-        --     { life = 1.0
-        --     , age  = 0.0
-        --     , inc  = 0.01
-        --     , amp  = 1.0
-        --     , func = id }
-        --   }
-        -- , Translate
-        --  { space = WorldSpace
-        --  , txyz  = V3 1.1 0 0
-        --  , tvel  = V3 0.0 0 0 }
+        , Movable
+          { space  = WorldSpace
+          , txyz   = V3 3 0 0
+          , tvel   = V3 0 0 0
+          , kinslv = [] }
+        , Attractable
+          { mass = 1.0
+          , acc  = V3 0 0 0 }
         ]
-      , osolvers    =
+      , posolvers      =
+        [ Identity
+        , Selectable
+        ]
+        , options   = defaultBackendOptions
+        , pparent   = nil
+        , pchildren = []
+      }
+    , PreObject
+      {
+        pname          = "planet"
+      , ptype          = Default
+      , pidx           = 0
+      , puuid          = nil
+      , modelIDXs      = [3]
+      , tsolvers       =
+        [ Identity
+        , Movable
+          { space  = WorldSpace
+          , txyz   = V3 0 0 0
+          , tvel   = V3 0 0 0
+          , kinslv = [] }
+        , Attractable
+          { mass = 1000.0
+          , acc  = V3 0 0 0 }
+        ]
+      , posolvers      =
         [ Identity
         , Selectable
         ]
@@ -112,7 +118,7 @@ initProject resx' resy' =
       , puuid      = nil
       , modelIDXs  = [0..75]
       , tsolvers   = []
-      , osolvers   = [ Identity ]
+      , posolvers  = [ Identity ]
       , options    = defaultBackendOptions
       , pparent    = nil
       , pchildren  = []
@@ -127,7 +133,7 @@ initProject resx' resy' =
       , puuid      = nil
       , modelIDXs  = [0]
       , tsolvers   = []      
-      , osolvers   = [ Identity ]
+      , posolvers   = [ Identity ]
       , options    = defaultBackendOptions
       , pparent    = nil
       , pchildren  = []
@@ -140,7 +146,7 @@ initProject resx' resy' =
       , puuid      = nil
       , modelIDXs  = [1]
       , tsolvers   = []      
-      , osolvers   = [ Identity ]
+      , posolvers   = [ Identity ]
       , options    = defaultBackendOptions'
       , pparent    = nil
       , pchildren  = []
@@ -215,11 +221,9 @@ main = do
   fobjs' <- mapM (toObject ftxTuples fdms) (preFontObject prj)
   iobjs' <- mapM (toObject itxTuples idms) (preIconObject prj)
 
-  animate
-    window
-    (1.0/60.0 :: Double) -- 60 fps?
-    initSettings
-    initGame
+  let
+    (_, initGame') = runState stepOnce $
+      initGame
       { 
         objs      = objs'
       , uniforms =
@@ -262,6 +266,12 @@ main = do
           }
         ]
       }
+
+  animate
+    window
+    (1.0/60.0 :: Double) -- 60 fps?
+    initSettings
+    initGame'
     gameLoop
   
   putStrLn "Exiting Game"
