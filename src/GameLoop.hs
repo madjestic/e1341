@@ -6,6 +6,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.MSF as TMSF
+import Data.UUID (nil)
 import Foreign.C.Types
 import GHC.Float
 import Lens.Micro
@@ -19,12 +20,14 @@ import Unsafe.Coerce
 import Graphics.RedViz.Camera as C
 import Graphics.RedViz.Game
 import Graphics.RedViz.Object as O
-import Graphics.RedViz.Solvable
+import Graphics.RedViz.Solvable as S
 import Graphics.RedViz.Transformable
 import Graphics.RedViz.Uniforms
 import Graphics.RedViz.Widget
 
---import Debug.Trace as DT
+import Debug.Trace as DT
+import Codec.Picture.Metadata (Value(Double))
+import Geomancy.Transform (translate)
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
@@ -65,16 +68,28 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                              , tslvrs = updateSolver <$> tslvrs t0 }
                           where
                             updateSolver :: Solvable -> Solvable
-                            updateSolver slv =
+                            updateSolver slv = -- DT.trace ("updateSolver :" ++ show slv) $
                               case slv of
-                                Identity                  -> slv
-                                --Movable  _ pos  vel  ss -> slv { txyz   = pos  + vel  `updateVel` s
-                                Movable  _ pos  vel  ss -> slv { txyz   = pos  + foldr (updateVel Identity) vel  ss
-                                                                 , kinslv = updateSolver <$> ss }
-                                Turnable _ _ _ rxyz avel ss -> slv { rxyz   = rxyz + foldr (updateVel Identity) avel ss
-                                                                , kinslv  = updateSolver <$> ss }
-                                Fadable l a inc _ _         -> slv { age    = min (a + inc) l}
-                                _ -> slv
+                                Identity
+                                  -> -- DT.trace ("Identity") $
+                                  slv
+                                Movable  _ pos  vel  ss -> -- DT.trace ("Movable") $
+                                  slv
+                                  { txyz   = pos  + foldr (updateVel Identity) vel  ss
+                                  , kinslv = updateSolver <$> ss }
+                                Turnable _ _ _ rxyz avel ss -> -- DT.trace ("Turnable") $
+                                  slv
+                                  { rxyz   = rxyz + foldr (updateVel Identity) avel ss
+                                  , kinslv  = updateSolver <$> ss }
+                                Fadable l a inc _ _         -> -- DT.trace ("Foldable") $
+                                  slv { age    = min (a + inc) l}
+                                Parentable _ -> -- DT.trace ("Parentable :" ++ show slv) $
+                                  slv { S.parent = if not . null $ activeObjs then O.uuid . head $ activeObjs else nil }
+                                  where
+                                    activeObjs = [x | x <- filter (O.active) $ objs g0]
+                                --Controllable {} -> undefined
+                                _ -> -- DT.trace ("_ :") $
+                                  slv
                                 
                             updateVel :: Solvable -> Solvable -> V3 Double -> V3 Double
                             updateVel _ slv1 v0 =
@@ -118,8 +133,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                                       !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                                     tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
-                                Parentable -> identity -- TODO: add inheriting transform from sertParent object
-                                ParentableToPlayer -> identity -- TODO: add inheriting transform to current camera
+                                Parentable uid -> identity
                                 _ -> identity
                     
           updateWidgets :: StateT Game IO ()
@@ -151,53 +165,63 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
               gameObjects :: Game -> Game
-              gameObjects g0 = g0 { objs = updateObject <$> objs g0 }
+              gameObjects g0 =
+                g0 { objs = updateObject <$> objs g0 }
                 where
                   updateObject :: Object -> Object
-                  updateObject obj0 =
+                  updateObject obj0 = -- DT.trace ("obj0 :" ++ show obj0) $
                     obj0 { transform = solveTransformable (transform obj0)
                          , selected  = lookedAt (head $ cameras g0) (xform (transform obj0)^.translation) 0.1 }
                     where
                       (<>) :: Solvable -> Solvable -> Solvable
                       (<>) slv0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = slv0 { tvel = amp * f (l-a) *^ v0 }
                       (<>) slv0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = slv0 { avel = amp * f (l-a) *^ av0 }
-                      (<>) slv0@(Movable _ _ v0 _)       (Attractable _ a)     = slv0 { tvel = v0 + a * 0 }  -- a*dt?
+                      (<>) slv0@(Movable _ _ v0 _)       (Attractable _ a)     = slv0 { tvel = v0 + a }  -- a*dt?
                       (<>) slv0 _ = slv0
 
                       solveTransformable :: Transformable -> Transformable
-                      solveTransformable t0 =
+                      solveTransformable t0 = -- DT.trace ("tslvrs t0 :" ++ show (tslvrs t0)) $
                         t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
                            , tslvrs = updateSolver <$> tslvrs t0 }
                         where
                           updateSolver :: Solvable -> Solvable
-                          updateSolver slv =
+                          updateSolver slv = -- DT.trace ("slv :" ++ show slv) $
                             case slv of
                               Identity             -> slv
-                              Movable _ pos _ ss   ->
-                                slv { txyz   = pos  + tvel (foldl (<>) slv (ss ++ (tslvrs.transform $ obj0)))
+                              Movable _ pos vel0 ss   ->
+                                slv { txyz   = pos  + vel0
+                                    , tvel   = tvel (foldl (<>) slv (ss ++ (tslvrs.transform $ obj0)))
                                     , kinslv = updateSolver <$> ss}
-                              Turnable _ _ _ rxyz _ ss ->
-                                slv { rxyz   = rxyz + avel (foldr (<>) slv (ss ++ (tslvrs.transform $ obj0)))
+                              Turnable _ _ _ rxyz avel0 ss ->
+                                slv { rxyz   = rxyz + avel0
+                                    , avel   = avel (foldr (<>) slv (ss ++ (tslvrs.transform $ obj0)))
                                     , kinslv  = updateSolver <$> ss }
                               Fadable l a inc _ _ ->
                                 slv { age    = min (a + inc) l}
                               Attractable m0 _ -> slv { acc = gravity }
                                 where 
                                   gravity :: V3 Double
-                                  gravity = 
-                                    foldr (attract obj0) (V3 0 0 0) (filter (\obj' -> O.uuid obj' /= O.uuid obj0) $ objs g0)
+                                  gravity =
+                                    if not.null $ attractors then foldr (attract obj0) (V3 0 0 0) attractors else V3 0 0 0
                                     where
+                                      attractors :: [Object]
+                                      attractors = filter (\obj' -> O.uuid obj' /= O.uuid obj0) $ objs g0
+
                                       attract :: Object -> Object -> V3 Double -> V3 Double
-                                      attract obj0 obj1 acc0 = acc0 + acc'
+                                      attract obj0 obj1 acc0 = -- DT.trace ("obj0 :" ++ show obj0) $
+                                        acc0 + acc'
                                         where
-                                          Attractable m1 _  = head ([ x | x@(Attractable _ _ ) <- tslvrs (transform obj1) ])
+                                          attractables = ([ x | x@(Attractable {} ) <- tslvrs (transform obj1) ])
+                                          Attractable m1 _  = if not.null $ attractables then head attractables else Attractable 0 (V3 0 0 0)
                                           p0   = (xform.transform $ obj0)^.translation
                                           p1   = (xform.transform $ obj1)^.translation
                                           dir  = p1 ^-^ p0                 :: V3 Double
                                           dist = norm dir                  :: Double
                                           g    = 6.673**(-11.0)            :: Double
                                           f    = g * m0 * m1 / dist**2.0   :: Double
-                                          acc' = (f / m0) *^ (dir ^/ dist)
+                                          acc' = case compare dist 0 of
+                                            EQ -> 0
+                                            _  -> (f / m0) *^ (dir ^/ dist)
                                         -- | F = G*@mass*m2/(dist^2);       // Newton's attract equation
                                         -- | a += (F/@mass)*normalize(dir); // Acceleration
 
@@ -239,9 +263,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                                   tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
-                              Attractable mass acc -> identity & translation .~ V3 0 0 0.1 -- acc -- identity -- & translation .~ pos
-                              Parentable -> identity -- TODO: add inheriting transform from sertParent object
-                              ParentableToPlayer -> identity -- TODO: add inheriting transform to current camera
+                              --Attractable mass acc -> identity & translation .~ V3 0 0 0.1 -- acc -- identity -- & translation .~ pos
+                              Parentable {} -> identity -- TODO: add inheriting transform from sertParent object
                               _ -> identity
 
           handleEvents :: StateT Game IO Bool
@@ -280,10 +303,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               modify $ mmove'
                               where
                                 mmove' :: Game -> Game
-                                mmove' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : tail (cameras g0) }
+                                mmove' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : tail (cameras g0) }
                                   where
-                                    updateCam :: Camera -> Camera
-                                    updateCam cam =
+                                    updateCamera :: Camera -> Camera
+                                    updateCamera cam =
                                       cam { ctransform = updateTransformable pos (ctransform cam)}
                                       where
                                         updateTransformable :: Point V2 CInt -> Transformable -> Transformable
@@ -338,6 +361,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   , ((ScancodeZ     , Released) , camPedestal   0 )
                   , ((ScancodeC     , Pressed)  , camPedestal (-1))
                   , ((ScancodeC     , Released) , camPedestal   0 )
+                  , ((ScancodeV     , Pressed)  , camFollow )
                   ]
                   where
                     updateController :: Camera
@@ -357,10 +381,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     camDolly n = modify camDolly'
                       where
                         camDolly' :: Game -> Game
-                        camDolly' g0 = g0 { cameras = updateCam (head $ cameras g0) : tail (cameras g0) }
+                        camDolly' g0 = g0 { cameras = updateCamera (head $ cameras g0) : tail (cameras g0) }
                           where
-                            updateCam :: Camera -> Camera
-                            updateCam cam =
+                            updateCamera :: Camera -> Camera
+                            updateCamera cam =
                               cam { ctransform = updateSolvers (ctransform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
@@ -371,10 +395,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     camTruck n = modify $ camTruck'
                       where
                         camTruck' :: Game -> Game
-                        camTruck' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
+                        camTruck' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
-                            updateCam :: Camera -> Camera
-                            updateCam cam =
+                            updateCamera :: Camera -> Camera
+                            updateCamera cam =
                               cam { ctransform = updateSolvers (ctransform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
@@ -385,10 +409,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     camPedestal n = modify $ camPedestal'
                       where
                         camPedestal' :: Game -> Game
-                        camPedestal' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
+                        camPedestal' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
-                            updateCam :: Camera -> Camera
-                            updateCam cam =
+                            updateCamera :: Camera -> Camera
+                            updateCamera cam =
                               cam { ctransform = updateSolvers (ctransform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
@@ -399,15 +423,48 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     camRoll n = modify $ camRoll'
                       where
                         camRoll' :: Game -> Game
-                        camRoll' g0 = g0 { cameras = (updateCam $ head (cameras g0)) : (tail (cameras g0)) }
+                        camRoll' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
-                            updateCam :: Camera -> Camera
-                            updateCam cam =
+                            updateCamera :: Camera -> Camera
+                            updateCamera cam =
                               cam { ctransform = updateSolvers (ctransform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
+
+                    camFollow :: StateT Game IO ()
+                    camFollow = modify $ camFollow'
+                      where
+                        camFollow' :: Game -> Game
+                        camFollow' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                          where
+                            updateCamera :: Camera -> Camera
+                            updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
+                              cam { C.parent = uid
+                                  , ctransform = 
+                                      if uid == nil
+                                      then ctransform cam
+                                      else (ctransform cam) {xform = rotY90 $ (xform . transform . head $ filter (\o -> O.uuid o == uid) (objs g0)) }
+                                  }
+                              where
+                                rotY90 :: M44 Double -> M44 Double
+                                rotY90 mtx0' = mtx
+                                  where                                    
+                                    mtx =
+                                      mkTransformationMat
+                                      rot
+                                      tr
+                                      where
+                                        rot = (identity :: M33 Double) !*! 
+                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))     -- pitch
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))     -- roll
+                                        tr  = mtx0'^.translation
+
+                                Parentable uid = if not . null $ parentables then head parentables else Parentable nil
+                                  where
+                                    parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam) ])                                  
                                                
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b

@@ -48,6 +48,7 @@ initProject resx' resy' =
     , "models/grid.gltf"
     , "models/adder_mk1.gltf"
     , "models/planet.gltf"
+    , "models/stars.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -60,40 +61,13 @@ initProject resx' resy' =
       {
         pname          = "spaceship"
       , ptype          = Default
-      , pidx           = 0
       , puuid          = nil
       , modelIDXs      = [2]
       , tsolvers       =
         [ Identity
         , Movable
           { space  = WorldSpace
-          , txyz   = V3 3 0 0
-          , tvel   = V3 0 0 0
-          , kinslv = [] }
-        , Attractable
-          { mass = 1.0
-          , acc  = V3 0 0 0 }
-        ]
-      , posolvers      =
-        [ Identity
-        , Selectable
-        ]
-        , options   = defaultBackendOptions
-        , pparent   = nil
-        , pchildren = []
-      }
-    , PreObject
-      {
-        pname          = "planet"
-      , ptype          = Default
-      , pidx           = 0
-      , puuid          = nil
-      , modelIDXs      = [3]
-      , tsolvers       =
-        [ Identity
-        , Movable
-          { space  = WorldSpace
-          , txyz   = V3 0 0 0
+          , txyz   = V3 4 0 0
           , tvel   = V3 0 0 0
           , kinslv = [] }
         , Attractable
@@ -107,6 +81,48 @@ initProject resx' resy' =
         , options   = defaultBackendOptions
         , pparent   = nil
         , pchildren = []
+        , pactive   = True
+      }
+    , PreObject
+      {
+        pname          = "planet"
+      , ptype          = Default
+      , puuid          = nil
+      , modelIDXs      = [3]
+      , tsolvers       =
+        [ Identity
+        , Movable
+          { space  = WorldSpace
+          , txyz   = V3 0 0 0
+          , tvel   = V3 0 0 0
+          , kinslv = [] }
+        , Attractable
+          { mass = 1000000.0
+          , acc  = V3 0 0 0 }
+        ]
+      , posolvers      =
+        [ Identity
+        , Selectable
+        ]
+        , options   = defaultBackendOptions
+        , pparent   = nil
+        , pchildren = []
+        , pactive   = False
+      }
+    , PreObject
+      {
+        pname          = "stars"
+      , ptype          = Default
+      , puuid          = nil
+      , modelIDXs      = [4]
+      , tsolvers       =
+        [ Identity ]
+      , posolvers      =
+        [ Identity ]
+        , options   = pointsOpts
+        , pparent   = nil
+        , pchildren = []
+        , pactive   = False
       }
     ]
   , preFontObject =
@@ -114,7 +130,6 @@ initProject resx' resy' =
       {
         pname      = "fonts"
       , ptype      = Font
-      , pidx       = 0
       , puuid      = nil
       , modelIDXs  = [0..75]
       , tsolvers   = []
@@ -122,6 +137,7 @@ initProject resx' resy' =
       , options    = defaultBackendOptions
       , pparent    = nil
       , pchildren  = []
+      , pactive    = False
       }
     ]
   , preIconObject =
@@ -129,7 +145,6 @@ initProject resx' resy' =
       {
         pname      = "crosshair"
       , ptype      = Icon
-      , pidx       = 0
       , puuid      = nil
       , modelIDXs  = [0]
       , tsolvers   = []      
@@ -137,22 +152,51 @@ initProject resx' resy' =
       , options    = defaultBackendOptions
       , pparent    = nil
       , pchildren  = []
+      , pactive    = False
       }
     , PreObject
       {
         pname      = "brackets"
       , ptype      = Icon
-      , pidx       = 1
       , puuid      = nil
       , modelIDXs  = [1]
       , tsolvers   = []      
       , posolvers   = [ Identity ]
-      , options    = defaultBackendOptions'
+      , options    = linesOpts
       , pparent    = nil
       , pchildren  = []
+      , pactive    = False
       }
     ]
-  , pcameras    = [ defaultCam ]
+  --, pcameras    = [ defaultCam' ]
+  , pcameras    = [ defaultCam' ]
+  }
+
+defaultCam' :: Camera  -- TODO: somehow a degault cam is read instead!
+defaultCam' =
+  Camera
+  {
+    name       = "PlayerCamera"
+  , apt        = 50.0
+  , foc        = 100.0
+  , ctransform =
+    defaultCamTransformable
+    { tslvrs =
+      [ Identity
+      , Controllable
+        { cvel   = (V3 0 0 0) -- velocity
+        , cypr   = (V3 0 0 0) -- rotation
+        , cyprS  = (V3 0 0 0) -- sum of rotations
+        }
+      , Parentable { parent = nil }
+      ]
+    }
+  , mouseS     = -0.0025
+  , keyboardRS = 0.05
+  , keyboardTS = 0.05
+  , cslvrs     = []
+  , uuid       = nil
+  , parent     = nil
   }
 
 type DTime = Double
@@ -226,12 +270,10 @@ main = do
       initGame
       { 
         objs      = objs'
+      , cameras   = pcameras prj
       , uniforms =
           defaultUniforms
-          { u_res   = (resX', resY')
-          , u_cam_a = apt defaultCam
-          , u_cam_f = foc defaultCam
-          }
+          { u_res   = (resX', resY') }
       , wgts =
         [ Cursor
           { active = True
