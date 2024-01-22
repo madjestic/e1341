@@ -64,7 +64,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       where
                         solveTransformable :: Transformable -> Transformable
                         solveTransformable t0 =
-                          t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
+                          t0 { xform  = foldr1 (!*!) $ solveXform (parentXform $ xform t0) <$> tslvrs t0
                              , tslvrs = updateSolver <$> tslvrs t0 }
                           where
                             updateSolver :: Solvable -> Solvable
@@ -97,6 +97,36 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 Fadable l a _ amp f -> amp * f (l-a) *^ v0
                                 _ -> v0
                          
+                            parentXform :: M44 Double -> M44 Double
+                            parentXform mtx0 =
+                              if (not . null $ parentables) && (C.parent cam0 /= nil)
+                              then
+                                if not . null $ parents
+                                then rotY90 . xform . transform . head $ parents
+                                else identity
+                              else mtx0
+                              where
+                                parents :: [Object]
+                                parents = filter (\o -> O.uuid o == C.parent cam0) (objs g0)
+
+                                parentables :: [Solvable]
+                                parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam0) ])
+
+                                rotY90 :: M44 Double -> M44 Double
+                                rotY90 mtx0' = mtx
+                                  where                                    
+                                    mtx =
+                                      mkTransformationMat
+                                      rot
+                                      tr
+                                      where
+                                        rot = (identity :: M33 Double) !*! 
+                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))     -- pitch
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))     -- roll
+                                        tr  = mtx0'^.translation
+
+
                             solveXform :: M44 Double -> Solvable -> M44 Double
                             solveXform mtx0 slv =
                               case slv of
@@ -133,7 +163,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                                       !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                                     tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
-                                Parentable uid -> identity
+                                Parentable _ -> identity
+  
                                 _ -> identity
                     
           updateWidgets :: StateT Game IO ()
@@ -152,7 +183,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           wgt { objects = filter selected $ objs g0 }
                         _ -> wgt
 
-          updateObjects :: StateT Game IO () -- TODO: finish refactor
+          updateObjects :: StateT Game IO ()
           updateObjects = modify gameObjects
             where
               lookedAt :: Camera -> V3 Double -> Double -> Bool
@@ -264,7 +295,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                                   tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
                               --Attractable mass acc -> identity & translation .~ V3 0 0 0.1 -- acc -- identity -- & translation .~ pos
-                              Parentable {} -> identity -- TODO: add inheriting transform from sertParent object
+                              Parentable {} -> identity
                               _ -> identity
 
           handleEvents :: StateT Game IO Bool
@@ -361,7 +392,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   , ((ScancodeZ     , Released) , camPedestal   0 )
                   , ((ScancodeC     , Pressed)  , camPedestal (-1))
                   , ((ScancodeC     , Released) , camPedestal   0 )
-                  , ((ScancodeV     , Pressed)  , camFollow )
+                  , ((ScancodeV     , Pressed)  , camParent )
+                  , ((ScancodeV     , Released) , camUnParent )
                   ]
                   where
                     updateController :: Camera
@@ -433,38 +465,28 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
 
-                    camFollow :: StateT Game IO ()
-                    camFollow = modify $ camFollow'
+                    camParent :: StateT Game IO ()
+                    camParent = modify $ camFollow'
                       where
                         camFollow' :: Game -> Game
                         camFollow' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
-                              cam { C.parent = uid
-                                  , ctransform = 
-                                      if uid == nil
-                                      then ctransform cam
-                                      else (ctransform cam) {xform = rotY90 $ (xform . transform . head $ filter (\o -> O.uuid o == uid) (objs g0)) }
-                                  }
+                              cam { C.parent = uid }
                               where
-                                rotY90 :: M44 Double -> M44 Double
-                                rotY90 mtx0' = mtx
-                                  where                                    
-                                    mtx =
-                                      mkTransformationMat
-                                      rot
-                                      tr
-                                      where
-                                        rot = (identity :: M33 Double) !*! 
-                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))     -- pitch
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))     -- roll
-                                        tr  = mtx0'^.translation
-
                                 Parentable uid = if not . null $ parentables then head parentables else Parentable nil
-                                  where
-                                    parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam) ])                                  
+                                  where parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam) ])                                  
+
+                    camUnParent :: StateT Game IO ()
+                    camUnParent = modify $ camFollow'
+                      where
+                        camFollow' :: Game -> Game
+                        camFollow' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                          where
+                            updateCamera :: Camera -> Camera
+                            updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
+                              cam { C.parent = nil }
                                                
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b
