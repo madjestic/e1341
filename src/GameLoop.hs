@@ -102,8 +102,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               if (not . null $ parentables) && (C.parent cam0 /= nil)
                               then
                                 if not . null $ parents
-                                then rotY90 . xform . transform . head $ parents
-                                else identity
+                                --then rotY90 . xform . transform . head $ parents
+                                then (xform . ctransform $ cam0)&translation .~ (xform . transform . head $ parents)^.translation
+                                else mtx0 --identity
                               else mtx0
                               where
                                 parents :: [Object]

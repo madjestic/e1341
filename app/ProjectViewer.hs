@@ -68,7 +68,7 @@ initProject resx' resy' =
         , Movable
           { space  = WorldSpace
           , txyz   = V3 4 0 0
-          , tvel   = V3 0 0 0
+          , tvel   = V3 0 0.014 0
           , kinslv = [] }
         , Attractable
           { mass = 1000.0
