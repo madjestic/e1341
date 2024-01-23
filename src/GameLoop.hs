@@ -466,16 +466,19 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
 
                     camParent :: Bool -> StateT Game IO ()
-                    camParent justPressed = modify $ camFollow'
+                    camParent justPressed = modify $ camParent'
                       where
-                        camFollow' :: Game -> Game
-                        camFollow' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camParent' :: Game -> Game
+                        camParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
                               cam { C.parent = uid
-                                  , ctransform = if not justPressed then ((ctransform cam) { xform = rotY90 !*! (xform.ctransform $ cam)}) else (ctransform cam) }
+                                  , ctransform = if not justPressed then ((ctransform cam) { xform = rotY90 !*! (xform.transform $ head parents)}) else (ctransform cam) }
                               where
+                                parents :: [Object]
+                                parents = filter (\o -> O.uuid o == uid) (objs g0)
+
                                 rotY90 :: M44 Double
                                 rotY90 = mtx
                                   where                                    
@@ -495,10 +498,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   where parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam) ])                                  
 
                     camUnParent :: StateT Game IO ()
-                    camUnParent = modify $ camFollow'
+                    camUnParent = modify $ camUnParent'
                       where
-                        camFollow' :: Game -> Game
-                        camFollow' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camUnParent' :: Game -> Game
+                        camUnParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
