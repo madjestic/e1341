@@ -361,7 +361,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   , ((ScancodeW     , Pressed,  False)  , camDolly    (-1))
                   , ((ScancodeW     , Pressed,  True)   , camDolly    (-1))
-                  , ((ScancodeW     , Released, True)   , camDolly      0 )
+                  , ((ScancodeW     , Released, False)   , camDolly      0 )
 
                   , ((ScancodeS     , Pressed,  False)  , camDolly      1 )
                   , ((ScancodeS     , Pressed,  True)   , camDolly      1 )
