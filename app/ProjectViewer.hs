@@ -70,6 +70,13 @@ initProject resx' resy' =
           , txyz   = V3 4 0 0
           , tvel   = V3 0 0.014 0
           , kinslv = [] }
+        , Turnable
+          { space  = WorldSpace
+          , cxyz   = V3 0 0 0
+          , rord   = XYZ
+          , rxyz   = V3 0 (pi/2) 0
+          , avel   = V3 0 0 0
+          , kinslv = [] }
         , Attractable
           { mass = 1000.0
           , acc  = V3 0 0 0 }

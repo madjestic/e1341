@@ -205,7 +205,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     , kinslv = updateSolver <$> ss}
                               Turnable _ _ _ rxyz avel0 ss ->
                                 slv { rxyz   = rxyz + avel0
-                                    , avel   = avel (foldr (<>) slv (ss ++ (tslvrs.transform $ obj0)))
+                                    , avel   = avel (foldl (<>) slv (ss ++ (tslvrs.transform $ obj0)))
                                     , kinslv  = updateSolver <$> ss }
                               Fadable l a inc _ _ ->
                                 slv { age    = min (a + inc) l}
@@ -474,13 +474,13 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
                               cam { C.parent = uid
-                                  , ctransform = if not justPressed then ((ctransform cam) { xform = rotY90 !*! (xform.transform $ head parents)}) else (ctransform cam) }
+                                  , ctransform = if not justPressed then ((ctransform cam) { xform = rotY !*! (xform.transform $ head parents)}) else (ctransform cam) }
                               where
                                 parents :: [Object]
                                 parents = filter (\o -> O.uuid o == uid) (objs g0)
 
-                                rotY90 :: M44 Double
-                                rotY90 = mtx
+                                rotY :: M44 Double
+                                rotY = mtx
                                   where                                    
                                     mtx =
                                       mkTransformationMat
@@ -488,9 +488,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       tr
                                       where
                                         rot = (identity :: M33 Double) !*! 
-                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))     -- pitch
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))     -- roll
+                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (pi)) -- yaw
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
                                         tr  = mtx0'^.translation
                                         mtx0' = identity :: M44 Double
 
