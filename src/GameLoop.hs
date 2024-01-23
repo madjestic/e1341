@@ -26,8 +26,6 @@ import Graphics.RedViz.Uniforms
 import Graphics.RedViz.Widget
 
 import Debug.Trace as DT
-import Codec.Picture.Metadata (Value(Double))
-import Geomancy.Transform (translate)
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
@@ -99,12 +97,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                          
                             parentXform :: M44 Double -> M44 Double
                             parentXform mtx0 =
-                              if (not . null $ parentables) && (C.parent cam0 /= nil)
-                              then
-                                if not . null $ parents
-                                --then rotY90 . xform . transform . head $ parents
-                                then (xform . ctransform $ cam0)&translation .~ (xform . transform . head $ parents)^.translation
-                                else mtx0 --identity
+                              if (not . null $ parentables) && (not . null $ parents) && (C.parent cam0 /= nil)
+                              then (xform . ctransform $ cam0)&translation .~ (xform . transform . head $ parents)^.translation
                               else mtx0
                               where
                                 parents :: [Object]
@@ -112,21 +106,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                                 parentables :: [Solvable]
                                 parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam0) ])
-
-                                rotY90 :: M44 Double -> M44 Double
-                                rotY90 mtx0' = mtx
-                                  where                                    
-                                    mtx =
-                                      mkTransformationMat
-                                      rot
-                                      tr
-                                      where
-                                        rot = (identity :: M33 Double) !*! 
-                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))     -- pitch
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))     -- roll
-                                        tr  = mtx0'^.translation
-
 
                             solveXform :: M44 Double -> Solvable -> M44 Double
                             solveXform mtx0 slv =
@@ -356,45 +335,65 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                               !*! fromQuaternion (axisAngle (mtx0^.(_m33._x)) (mouseS cam^._x * (fromIntegral $ pos^._y))) -- pitch
                                               !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (mouseS cam^._x * (fromIntegral $ pos^._x))) -- yaw
 
-                updateKeyboard :: (Monad m) => [((Scancode, InputMotion), m ())] -> [Event] -> m ()
+                updateKeyboard :: (Monad m) => [((Scancode, InputMotion, Bool), m ())] -> [Event] -> m ()
                 updateKeyboard emap = mapM_ (processEvent emap)
                   where
-                    processEvent :: (Monad m) => [((Scancode, InputMotion) , m ())] -> Event -> m ()
+                    processEvent :: (Monad m) => [((Scancode, InputMotion, Bool) , m ())] -> Event -> m ()
                     processEvent mapping e =
                       let
-                        mk :: Maybe (Scancode, InputMotion)
+                        mk :: Maybe (Scancode, InputMotion, Bool)
                         mk = case eventPayload e of
                                KeyboardEvent keyboardEvent -> Just
                                  ( keysymScancode (keyboardEventKeysym keyboardEvent)
-                                 , keyboardEventKeyMotion keyboardEvent )
+                                 , keyboardEventKeyMotion keyboardEvent
+                                 , keyboardEventRepeat keyboardEvent )
                                _ -> Nothing
                       in case mk of
                         Nothing     -> return ()
-                        Just (sc, km) -> case lookup (sc, km) mapping of
+                        Just (sc, km, b) -> case lookup (sc, km, b) mapping of
                                           Nothing -> return ()
                                           Just k'  -> k'
                 
-                mapKeyEvents :: [((Scancode, InputMotion), StateT Game IO ())]
+                mapKeyEvents :: [((Scancode, InputMotion, Bool), StateT Game IO ())]
                 mapKeyEvents =
-                  [ ((ScancodeEscape, Pressed)  , quitE True      )
-                  , ((ScancodeW     , Pressed)  , camDolly    (-1))
-                  , ((ScancodeW     , Released) , camDolly      0 )
-                  , ((ScancodeS     , Pressed)  , camDolly      1 )
-                  , ((ScancodeS     , Released) , camDolly      0 )
-                  , ((ScancodeQ     , Pressed)  , camRoll       1 )
-                  , ((ScancodeQ     , Released) , camRoll       0 )
-                  , ((ScancodeE     , Pressed)  , camRoll     (-1))
-                  , ((ScancodeE     , Released) , camRoll       0 )
-                  , ((ScancodeA     , Pressed)  , camTruck    (-1))
-                  , ((ScancodeA     , Released) , camTruck      0 )
-                  , ((ScancodeD     , Pressed)  , camTruck      1 )
-                  , ((ScancodeD     , Released) , camTruck      0 )
-                  , ((ScancodeZ     , Pressed)  , camPedestal ( 1))
-                  , ((ScancodeZ     , Released) , camPedestal   0 )
-                  , ((ScancodeC     , Pressed)  , camPedestal (-1))
-                  , ((ScancodeC     , Released) , camPedestal   0 )
-                  , ((ScancodeV     , Pressed)  , camParent )
-                  , ((ScancodeV     , Released) , camUnParent )
+                  [ ((ScancodeEscape, Pressed,  False)  , quitE True )
+                  , ((ScancodeEscape, Pressed,  True )  , quitE True )
+
+                  , ((ScancodeW     , Pressed,  False)  , camDolly    (-1))
+                  , ((ScancodeW     , Pressed,  True)   , camDolly    (-1))
+                  , ((ScancodeW     , Released, True)   , camDolly      0 )
+
+                  , ((ScancodeS     , Pressed,  False)  , camDolly      1 )
+                  , ((ScancodeS     , Pressed,  True)   , camDolly      1 )
+                  , ((ScancodeS     , Released, False)  , camDolly      0 )
+
+                  , ((ScancodeQ     , Pressed,  False)  , camRoll       1 )
+                  , ((ScancodeQ     , Pressed,  True)   , camRoll       1 )
+                  , ((ScancodeQ     , Released, False)  , camRoll       0 )
+
+                  , ((ScancodeE     , Pressed,  False)  , camRoll     (-1))
+                  , ((ScancodeE     , Pressed,  True)   , camRoll     (-1))
+                  , ((ScancodeE     , Released, False)  , camRoll       0 )
+
+                  , ((ScancodeA     , Pressed,  False)  , camTruck    (-1))
+                  , ((ScancodeA     , Pressed,  True)   , camTruck    (-1))
+                  , ((ScancodeA     , Released, False)  , camTruck      0 )
+
+                  , ((ScancodeD     , Pressed,  False)  , camTruck      1 )
+                  , ((ScancodeD     , Pressed,  True)   , camTruck      1 )
+                  , ((ScancodeD     , Released, False)  , camTruck      0 )
+
+                  , ((ScancodeZ     , Pressed,  False)  , camPedestal ( 1))
+                  , ((ScancodeZ     , Pressed,  True)   , camPedestal ( 1))
+                  , ((ScancodeZ     , Released, False)  , camPedestal   0 )
+
+                  , ((ScancodeC     , Pressed,  False)  , camPedestal (-1))
+                  , ((ScancodeC     , Pressed,  True)   , camPedestal (-1))
+                  , ((ScancodeC     , Released, False)  , camPedestal   0 )
+
+                  , ((ScancodeV     , Pressed,  False)  , camParent False )
+                  , ((ScancodeV     , Pressed,  True)   , camParent True  )
+                  , ((ScancodeV     , Released, False)  , camUnParent     )
                   ]
                   where
                     updateController :: Camera
@@ -466,16 +465,32 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
 
-                    camParent :: StateT Game IO ()
-                    camParent = modify $ camFollow'
+                    camParent :: Bool -> StateT Game IO ()
+                    camParent justPressed = modify $ camFollow'
                       where
                         camFollow' :: Game -> Game
                         camFollow' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
-                              cam { C.parent = uid }
+                              cam { C.parent = uid
+                                  , ctransform = if not justPressed then ((ctransform cam) { xform = rotY90 !*! (xform.ctransform $ cam)}) else (ctransform cam) }
                               where
+                                rotY90 :: M44 Double
+                                rotY90 = mtx
+                                  where                                    
+                                    mtx =
+                                      mkTransformationMat
+                                      rot
+                                      tr
+                                      where
+                                        rot = (identity :: M33 Double) !*! 
+                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))     -- pitch
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))     -- roll
+                                        tr  = mtx0'^.translation
+                                        mtx0' = identity :: M44 Double
+
                                 Parentable uid = if not . null $ parentables then head parentables else Parentable nil
                                   where parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam) ])                                  
 
