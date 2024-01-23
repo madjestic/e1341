@@ -396,18 +396,20 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   , ((ScancodeV     , Released, False)  , camUnParent     )
                   ]
                   where
-                    updateController :: Camera
+                    updateController :: Either Camera Object
                                      -> V3 Double
                                      -> V3 Double
                                      -> Solvable
                                      -> Solvable
-                    updateController cam vel0 ypr0 slv0 =
-                      case slv0 of
-                        ctrl@(Controllable _ _ cyprS) ->
-                          ctrl { cvel  = keyboardTS cam * vel0
-                               , cypr  = keyboardRS cam * ypr0
-                               , cyprS = keyboardRS cam * ypr0 + cyprS } 
-                        _ -> slv0
+                    updateController upd vel0 ypr0 slv0 = case upd of
+                      Left cam ->
+                        case slv0 of
+                          ctrl@(Controllable _ _ cyprS) ->
+                            ctrl { cvel  = keyboardTS cam * vel0
+                                 , cypr  = keyboardRS cam * ypr0
+                                 , cyprS = keyboardRS cam * ypr0 + cyprS } 
+                          _ -> slv0
+                      Right obj -> undefined
 
                     camDolly :: Integer -> StateT Game IO ()
                     camDolly n = modify camDolly'
@@ -421,7 +423,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
-                                  t0 { tslvrs = updateController cam (V3 0 0 (fromIntegral n)) (V3 0 0 0) <$> tslvrs t0}
+                                  t0 { tslvrs = updateController (Left cam) (V3 0 0 (fromIntegral n)) (V3 0 0 0) <$> tslvrs t0}
                                     
                     camTruck :: Integer -> StateT Game IO ()
                     camTruck n = modify $ camTruck'
@@ -435,7 +437,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
-                                  t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
+                                  t0 { tslvrs = updateController (Left cam) (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
                                     
                     camPedestal :: Integer -> StateT Game IO ()
                     camPedestal n = modify $ camPedestal'
@@ -449,7 +451,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
-                                  t0 { tslvrs = updateController cam (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs t0}
+                                  t0 { tslvrs = updateController (Left cam) (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs t0}
 
                     camRoll :: Integer -> StateT Game IO ()
                     camRoll n = modify $ camRoll'
@@ -463,7 +465,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
-                                  t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
+                                  t0 { tslvrs = updateController (Left cam) (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
 
                     camParent :: Bool -> StateT Game IO ()
                     camParent justPressed = modify $ camParent'
