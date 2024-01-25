@@ -18,12 +18,10 @@ import Linear.Metric (normalize)
 import Data.Set as DS ( fromList, toList )
 
 import Graphics.RedViz.Backend
-import Graphics.RedViz.Camera
 import Graphics.RedViz.Descriptor
 import Graphics.RedViz.Drawable
 import Graphics.RedViz.Game
 import Graphics.RedViz.Material as R
-import Graphics.RedViz.Object
 import Graphics.RedViz.Project
 import Graphics.RedViz.Rendering 
 import Graphics.RedViz.Solvable
@@ -31,6 +29,8 @@ import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Transformable
 import Graphics.RedViz.Widget
 import Graphics.RedViz.Uniforms
+
+import Graphics.RedViz.Entity as E
 
 import GameLoop
 --import Debug.Trace as DT
@@ -175,20 +175,18 @@ initProject resx' resy' =
       , pactive    = False
       }
     ]
-  --, pcameras    = [ defaultCam' ]
   , pcameras    = [ defaultCam' ]
   }
 
-defaultCam' :: Camera  -- TODO: somehow a degault cam is read instead!
-defaultCam' =
-  Camera
-  {
-    name       = "PlayerCamera"
+defaultCam' :: Entity  -- TODO: somehow a degault cam is read instead!
+defaultCam' = 
+  defaultEntity
+  { lable      = "PlayerCamera"
   , apt        = 50.0
   , foc        = 100.0
-  , ctransform =
+  , transform  =
     defaultCamTransformable
-    { tslvrs =
+    { tslvrs   =
       [ Identity
       , Controllable
         { cvel   = (V3 0 0 0) -- velocity
@@ -201,9 +199,9 @@ defaultCam' =
   , mouseS     = -0.0025
   , keyboardRS = 0.05
   , keyboardTS = 0.05
-  , cslvrs     = []
-  , uuid       = nil
-  , parent     = nil
+  , slvrs      = []
+  , E.uuid     = nil
+  , E.parent   = nil
   }
 
 type DTime = Double

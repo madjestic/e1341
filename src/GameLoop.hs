@@ -17,13 +17,12 @@ import Linear.V3
 import SDL hiding (Texture, normalize)
 import Unsafe.Coerce
 
-import Graphics.RedViz.Camera as C
+import Graphics.RedViz.Entity as E
 import Graphics.RedViz.Game
-import Graphics.RedViz.Object as O
 import Graphics.RedViz.Solvable as S
 import Graphics.RedViz.Transformable
 import Graphics.RedViz.Uniforms
-import Graphics.RedViz.Widget
+import Graphics.RedViz.Widget as W
 
 import Debug.Trace as DT
 
@@ -58,7 +57,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                 where
                   updateCamera :: Camera -> Camera
                   updateCamera cam0 =
-                    cam0 { ctransform = solveTransformable (ctransform cam0) }
+                    cam0 { transform = solveTransformable (transform cam0) }
                       where
                         solveTransformable :: Transformable -> Transformable
                         solveTransformable t0 =
@@ -82,9 +81,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 Fadable l a inc _ _         -> -- DT.trace ("Foldable") $
                                   slv { age    = min (a + inc) l}
                                 Parentable _ -> -- DT.trace ("Parentable :" ++ show slv) $
-                                  slv { S.parent = if not . null $ activeObjs then O.uuid . head $ activeObjs else nil }
+                                  slv { S.parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
                                   where
-                                    activeObjs = [x | x <- filter (O.active) $ objs g0]
+                                    activeObjs = [x | x <- filter E.active $ objs g0]
                                 --Controllable {} -> undefined
                                 _ -> -- DT.trace ("_ :") $
                                   slv
@@ -97,15 +96,15 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                          
                             parentXform :: M44 Double -> M44 Double
                             parentXform mtx0 =
-                              if (not . null $ parentables) && (not . null $ parents) && (C.parent cam0 /= nil)
-                              then (xform . ctransform $ cam0)&translation .~ (xform . transform . head $ parents)^.translation
+                              if (not . null $ parentables) && (not . null $ parents) && (E.parent cam0 /= nil)
+                              then (xform . transform $ cam0)&translation .~ (xform . transform . head $ parents)^.translation
                               else mtx0
                               where
                                 parents :: [Object]
-                                parents = filter (\o -> O.uuid o == C.parent cam0) (objs g0)
+                                parents = filter (\o -> uuid o == E.parent cam0) (objs g0)
 
                                 parentables :: [Solvable]
-                                parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam0) ])
+                                parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam0) ])
 
                             solveXform :: M44 Double -> Solvable -> M44 Double
                             solveXform mtx0 slv =
@@ -169,8 +168,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
               lookedAt :: Camera -> V3 Double -> Double -> Bool
               lookedAt cam centroid radius = s
                 where
-                  cxform          = xform . ctransform $ cam
-                  camera_position = (xform . ctransform $ cam)^.translation
+                  cxform          = xform . transform $ cam
+                  camera_position = (xform . transform $ cam)^.translation
                   camera_lookat   = V3 0 0 (-1) *! cxform^._m33
                   ivec            = normalize $ centroid - camera_position :: V3 Double
                   s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
@@ -216,7 +215,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     if not.null $ attractors then foldr (attract obj0) (V3 0 0 0) attractors else V3 0 0 0
                                     where
                                       attractors :: [Object]
-                                      attractors = filter (\obj' -> O.uuid obj' /= O.uuid obj0) $ objs g0
+                                      attractors = filter (\obj' -> uuid obj' /= uuid obj0) $ objs g0
 
                                       attract :: Object -> Object -> V3 Double -> V3 Double
                                       attract obj0 obj1 acc0 = -- DT.trace ("obj0 :" ++ show obj0) $
@@ -318,7 +317,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   where
                                     updateCamera :: Camera -> Camera
                                     updateCamera cam =
-                                      cam { ctransform = updateTransformable pos (ctransform cam)}
+                                      cam { transform = updateTransformable pos (transform cam)}
                                       where
                                         updateTransformable :: Point V2 CInt -> Transformable -> Transformable
                                         updateTransformable _ t0@(Transformable mtx0 _) =
@@ -359,41 +358,41 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   [ ((ScancodeEscape, Pressed,  False)  , quitE True )
                   , ((ScancodeEscape, Pressed,  True )  , quitE True )
 
-                  , ((ScancodeW     , Pressed,  False)  , camDolly    (-1))
-                  , ((ScancodeW     , Pressed,  True)   , camDolly    (-1))
-                  , ((ScancodeW     , Released, False)   , camDolly      0 )
+                  , ((ScancodeW     , Pressed,  False)  , ctrlDolly    (-1))
+                  , ((ScancodeW     , Pressed,  True)   , ctrlDolly    (-1))
+                  , ((ScancodeW     , Released, False)  , ctrlDolly      0 )
 
-                  , ((ScancodeS     , Pressed,  False)  , camDolly      1 )
-                  , ((ScancodeS     , Pressed,  True)   , camDolly      1 )
-                  , ((ScancodeS     , Released, False)  , camDolly      0 )
+                  , ((ScancodeS     , Pressed,  False)  , ctrlDolly      1 )
+                  , ((ScancodeS     , Pressed,  True)   , ctrlDolly      1 )
+                  , ((ScancodeS     , Released, False)  , ctrlDolly      0 )
 
-                  , ((ScancodeQ     , Pressed,  False)  , camRoll       1 )
-                  , ((ScancodeQ     , Pressed,  True)   , camRoll       1 )
-                  , ((ScancodeQ     , Released, False)  , camRoll       0 )
+                  , ((ScancodeQ     , Pressed,  False)  , ctrlRoll       1 )
+                  , ((ScancodeQ     , Pressed,  True)   , ctrlRoll       1 )
+                  , ((ScancodeQ     , Released, False)  , ctrlRoll       0 )
 
-                  , ((ScancodeE     , Pressed,  False)  , camRoll     (-1))
-                  , ((ScancodeE     , Pressed,  True)   , camRoll     (-1))
-                  , ((ScancodeE     , Released, False)  , camRoll       0 )
+                  , ((ScancodeE     , Pressed,  False)  , ctrlRoll     (-1))
+                  , ((ScancodeE     , Pressed,  True)   , ctrlRoll     (-1))
+                  , ((ScancodeE     , Released, False)  , ctrlRoll       0 )
 
-                  , ((ScancodeA     , Pressed,  False)  , camTruck    (-1))
-                  , ((ScancodeA     , Pressed,  True)   , camTruck    (-1))
-                  , ((ScancodeA     , Released, False)  , camTruck      0 )
+                  , ((ScancodeA     , Pressed,  False)  , ctrlTruck    (-1))
+                  , ((ScancodeA     , Pressed,  True)   , ctrlTruck    (-1))
+                  , ((ScancodeA     , Released, False)  , ctrlTruck      0 )
 
-                  , ((ScancodeD     , Pressed,  False)  , camTruck      1 )
-                  , ((ScancodeD     , Pressed,  True)   , camTruck      1 )
-                  , ((ScancodeD     , Released, False)  , camTruck      0 )
+                  , ((ScancodeD     , Pressed,  False)  , ctrlTruck      1 )
+                  , ((ScancodeD     , Pressed,  True)   , ctrlTruck      1 )
+                  , ((ScancodeD     , Released, False)  , ctrlTruck      0 )
 
-                  , ((ScancodeZ     , Pressed,  False)  , camPedestal ( 1))
-                  , ((ScancodeZ     , Pressed,  True)   , camPedestal ( 1))
-                  , ((ScancodeZ     , Released, False)  , camPedestal   0 )
+                  , ((ScancodeZ     , Pressed,  False)  , ctrlPedestal ( 1))
+                  , ((ScancodeZ     , Pressed,  True)   , ctrlPedestal ( 1))
+                  , ((ScancodeZ     , Released, False)  , ctrlPedestal   0 )
 
-                  , ((ScancodeC     , Pressed,  False)  , camPedestal (-1))
-                  , ((ScancodeC     , Pressed,  True)   , camPedestal (-1))
-                  , ((ScancodeC     , Released, False)  , camPedestal   0 )
+                  , ((ScancodeC     , Pressed,  False)  , ctrlPedestal (-1))
+                  , ((ScancodeC     , Pressed,  True)   , ctrlPedestal (-1))
+                  , ((ScancodeC     , Released, False)  , ctrlPedestal   0 )
 
-                  , ((ScancodeV     , Pressed,  False)  , camParent False )
-                  , ((ScancodeV     , Pressed,  True)   , camParent True  )
-                  , ((ScancodeV     , Released, False)  , camUnParent     )
+                  , ((ScancodeV     , Pressed,  False)  , ctrlParent False )
+                  , ((ScancodeV     , Pressed,  True)   , ctrlParent True  )
+                  , ((ScancodeV     , Released, False)  , ctrlUnParent     )
                   ]
                   where
                     updateController :: Either Camera Object
@@ -411,75 +410,75 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           _ -> slv0
                       Right obj -> undefined
 
-                    camDolly :: Integer -> StateT Game IO ()
-                    camDolly n = modify camDolly'
+                    ctrlDolly :: Integer -> StateT Game IO ()
+                    ctrlDolly n = modify camDolly'
                       where
                         camDolly' :: Game -> Game
                         camDolly' g0 = g0 { cameras = updateCamera (head $ cameras g0) : tail (cameras g0) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { ctransform = updateSolvers (ctransform cam)}
+                              cam { transform = updateSolvers (transform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController (Left cam) (V3 0 0 (fromIntegral n)) (V3 0 0 0) <$> tslvrs t0}
                                     
-                    camTruck :: Integer -> StateT Game IO ()
-                    camTruck n = modify $ camTruck'
+                    ctrlTruck :: Integer -> StateT Game IO ()
+                    ctrlTruck n = modify $ camTruck'
                       where
                         camTruck' :: Game -> Game
                         camTruck' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { ctransform = updateSolvers (ctransform cam)}
+                              cam { transform = updateSolvers (transform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController (Left cam) (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
                                     
-                    camPedestal :: Integer -> StateT Game IO ()
-                    camPedestal n = modify $ camPedestal'
+                    ctrlPedestal :: Integer -> StateT Game IO ()
+                    ctrlPedestal n = modify $ camPedestal'
                       where
                         camPedestal' :: Game -> Game
                         camPedestal' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { ctransform = updateSolvers (ctransform cam)}
+                              cam { transform = updateSolvers (transform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController (Left cam) (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs t0}
 
-                    camRoll :: Integer -> StateT Game IO ()
-                    camRoll n = modify $ camRoll'
+                    ctrlRoll :: Integer -> StateT Game IO ()
+                    ctrlRoll n = modify $ camRoll'
                       where
                         camRoll' :: Game -> Game
                         camRoll' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { ctransform = updateSolvers (ctransform cam)}
+                              cam { transform = updateSolvers (transform cam)}
                               where
                                 updateSolvers :: Transformable -> Transformable
                                 updateSolvers t0 =
                                   t0 { tslvrs = updateController (Left cam) (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
 
-                    camParent :: Bool -> StateT Game IO ()
-                    camParent justPressed = modify $ camParent'
+                    ctrlParent :: Bool -> StateT Game IO ()
+                    ctrlParent justPressed = modify $ camParent'
                       where
                         camParent' :: Game -> Game
                         camParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
-                            updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
-                              cam { C.parent = uid
-                                  , ctransform = if not justPressed then ((ctransform cam) { xform = rotY !*! (xform.transform $ head parents)}) else (ctransform cam) }
+                            updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
+                              cam { E.parent = uid
+                                  , transform = if not justPressed then ((transform cam) { xform = rotY !*! (xform.transform $ head parents)}) else (transform cam) }
                               where
                                 parents :: [Object]
-                                parents = filter (\o -> O.uuid o == uid) (objs g0)
+                                parents = filter (\o -> uuid o == uid) (objs g0)
 
                                 rotY :: M44 Double
                                 rotY = mtx
@@ -497,17 +496,17 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         mtx0' = identity :: M44 Double
 
                                 Parentable uid = if not . null $ parentables then head parentables else Parentable nil
-                                  where parentables = ([ x | x@(Parentable {} ) <- tslvrs (ctransform cam) ])                                  
+                                  where parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                                  
 
-                    camUnParent :: StateT Game IO ()
-                    camUnParent = modify $ camUnParent'
+                    ctrlUnParent :: StateT Game IO ()
+                    ctrlUnParent = modify $ camUnParent'
                       where
                         camUnParent' :: Game -> Game
                         camUnParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
                           where
                             updateCamera :: Camera -> Camera
-                            updateCamera cam = -- DT.trace ("ctransform cam : " ++ show (ctransform cam)) $
-                              cam { C.parent = nil }
+                            updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
+                              cam { E.parent = nil }
                                                
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b
