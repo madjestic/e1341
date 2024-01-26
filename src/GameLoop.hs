@@ -45,7 +45,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
     updateGame r = do
       updateEntities
       updateWidgets
-      --updateEntities
       updateTick r
       handleEvents
         where
@@ -192,100 +191,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           Fadable l a _ amp f -> amp * f (l-a) *^ v0
                           _ -> v0
 
-              -- gameCameras :: Game -> Game
-              -- gameCameras g0 = g0 { cameras = updateCamera <$> cameras g0 }
-              --   where
-              --     updateCamera :: Camera -> Camera
-              --     updateCamera cam0 =
-              --       cam0 { transform = solveTransformable (transform cam0) }
-              --         where
-              --           solveTransformable :: Transformable -> Transformable
-              --           solveTransformable t0 =
-              --             t0 { xform  = foldr1 (!*!) $ solveXform (parentXform $ xform t0) <$> tslvrs t0
-              --                , tslvrs = updateSolver <$> tslvrs t0 }
-              --             where
-              --               updateSolver :: Solvable -> Solvable
-              --               updateSolver slv = -- DT.trace ("updateSolver :" ++ show slv) $
-              --                 case slv of
-              --                   Identity
-              --                     -> -- DT.trace ("Identity") $
-              --                     slv
-              --                   Movable  _ pos  vel  ss -> -- DT.trace ("Movable") $
-              --                     slv
-              --                     { txyz   = pos  + foldr (updateVel Identity) vel  ss
-              --                     , kinslv = updateSolver <$> ss }
-              --                   Turnable _ _ _ rxyz avel ss -> -- DT.trace ("Turnable") $
-              --                     slv
-              --                     { rxyz   = rxyz + foldr (updateVel Identity) avel ss
-              --                     , kinslv  = updateSolver <$> ss }
-              --                   Fadable l a inc _ _         -> -- DT.trace ("Foldable") $
-              --                     slv { age    = min (a + inc) l}
-              --                   Parentable _ -> -- DT.trace ("Parentable :" ++ show slv) $
-              --                     slv { S.parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
-              --                     where
-              --                       activeObjs = [x | x <- filter E.active $ objs g0]
-              --                   --Controllable {} -> undefined
-              --                   _ -> -- DT.trace ("_ :") $
-              --                     slv
-                                
-              --               updateVel :: Solvable -> Solvable -> V3 Double -> V3 Double
-              --               updateVel _ slv1 v0 =
-              --                 case slv1 of
-              --                   Fadable l a _ amp f -> amp * f (l-a) *^ v0
-              --                   _ -> v0
-                         
-              --               parentXform :: M44 Double -> M44 Double
-              --               parentXform mtx0 =
-              --                 if (not . null $ parentables) && (not . null $ parents) && (E.parent cam0 /= nil)
-              --                 then (xform . transform $ cam0)&translation .~ (xform . transform . head $ parents)^.translation
-              --                 else mtx0
-              --                 where
-              --                   parents :: [Object]
-              --                   parents = filter (\o -> uuid o == E.parent cam0) (objs g0)
-
-              --                   parentables :: [Solvable]
-              --                   parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam0) ])
-
-              --               solveXform :: M44 Double -> Solvable -> M44 Double
-              --               solveXform mtx0 slv =
-              --                 case slv of
-              --                   Identity -> identity
-              --                   Movable cs pos _ _ ->
-              --                     case cs of
-              --                       WorldSpace  -> identity & translation .~ pos
-              --                       ObjectSpace -> undefined
-              --                   Turnable _ _ rord rxyz _ _ -> transform' identity
-              --                     where
-              --                       transform' :: M44 Double -> M44 Double
-              --                       transform' mtx0' = mtx
-              --                         where
-              --                           mtx =
-              --                             mkTransformationMat
-              --                             rot
-              --                             tr
-              --                             where
-              --                               rot    = 
-              --                                 identity !*!
-              --                                 case rord of
-              --                                   XYZ ->
-              --                                         fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (rxyz^._x)) -- pitch
-              --                                     !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (rxyz^._y)) -- yaw
-              --                                     !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
-              --                               tr     = (identity::M44 Double)^.translation
-                         
-              --                   Controllable cvel0 ypr0 _ ->
-              --                     mkTransformationMat rot tr
-              --                     where
-              --                       rot = 
-              --                         (mtx0^._m33) !*!
-              --                             fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
-              --                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
-              --                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
-              --                       tr  = mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
-              --                   Parentable _ -> identity
-  
-              --                   _ -> identity
-                    
           updateWidgets :: StateT Game IO ()
           updateWidgets = do
             modify solveWidgets
@@ -500,9 +405,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera cam  = -- DT.trace ("transform cam : " ++ show (transform cam)) $
                               cam { E.parent  = uid
                                   , parented  = not $ parented cam
-                                  --, transform = transform $ head parents }
                                   , transform = if not $ parented cam then (transform cam) *!* (transform $ head parents) else transform cam}
-                                  --, transform = rotY (transform cam)}
                               where
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
@@ -525,22 +428,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         tr  = mtx0'^.translation
                                         mtx0' = identity :: M44 Double
 
-                                -- rotY :: Transformable -> Transformable
-                                -- --rotY t = t { xform = (xform t) !*! (mtx !*! inv44 (xform t)) }
-                                -- rotY t = t { xform = mtx !*! (xform t) }
-                                --   where                                    
-                                --     mtx =
-                                --       mkTransformationMat
-                                --       rot
-                                --       tr
-                                --       where
-                                --         rot = (identity :: M33 Double) !*! 
-                                --               fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
-                                --           !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi/2)) -- yaw
-                                --           !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
-                                --         tr  = mtx0'^.translation
-                                --         mtx0' = identity :: M44 Double
-
                                 Parentable uid = if not . null $ parentables then head parentables else Parentable nil
                                   where parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                                  
 
@@ -553,11 +440,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
                               cam { E.parent = uid
                                   , parented = True }
-                                  --, transform = transform $ head parents }
-
-                          --         --, transform = rotY . transform $ cam }
-                          --         --, transform = transform $ cam }
-                          --     --     , transform = ((transform cam) { xform = rotY !*! (xform.transform $ head parents)})}
                               where
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
@@ -565,32 +447,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 Parentable uid = if not . null $ parentables then head parentables else Parentable nil
                                 parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                  
 
-                          --       rotY :: Transformable -> Transformable
-                          --       rotY t = t { xform = mtx !*! xform t }
-                          --         where                                    
-                          --           mtx =
-                          --             mkTransformationMat
-                          --             rot
-                          --             tr
-                          --             where
-                          --               rot = (identity :: M33 Double) !*! 
-                          --                     fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
-                          --                 !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-pi)) -- yaw
-                          --                 !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
-                          --               tr  = mtx0'^.translation
-                          --               mtx0' = identity :: M44 Double
-
                     ctrlUnParent :: StateT Game IO ()
                     ctrlUnParent = TMSF.gets $ const () --modify $ camUnParent'
-                      -- where
-                      --   foo :: Game
-                      --   foo = 
-                        --   camUnParent' :: Game -> Game
-                      --   camUnParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
-                      --     where
-                      --       updateCamera :: Camera -> Camera
-                      --       updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
-                      --         cam { parented = not $ parented cam }
                                                
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b
