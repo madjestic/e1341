@@ -175,11 +175,11 @@ initProject resx' resy' =
       , pactive    = False
       }
     ]
-  , pcameras    = [ defaultCam' ]
+  , pcameras    = [ playCam ]
   }
 
-defaultCam' :: Entity  -- TODO: somehow a degault cam is read instead!
-defaultCam' = 
+playCam :: Entity  -- TODO: somehow a degault cam is read instead!
+playCam = 
   defaultEntity
   { lable      = "PlayerCamera"
   , apt        = 50.0
