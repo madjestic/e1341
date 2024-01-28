@@ -251,19 +251,17 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       cam { transform = updateTransformable pos (transform cam)}
                                       where
                                         updateTransformable :: Point V2 CInt -> Transformable -> Transformable
-                                        updateTransformable _ t0@(Transformable mtx0 _) =
-                                          t0
-                                          { xform = 
-                                              mkTransformationMat
-                                              rot
-                                              tr
-                                          }
+                                        updateTransformable pos t0@(Transformable _ slvrs0) = t0 { tslvrs = updateControllable <$> tslvrs t0 }
                                           where
-                                            tr = view translation mtx0
-                                            rot = 
-                                              (mtx0^._m33)
-                                              !*! fromQuaternion (axisAngle (mtx0^.(_m33._x)) (mouseS cam^._x * (fromIntegral $ pos^._y))) -- pitch
-                                              !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (mouseS cam^._x * (fromIntegral $ pos^._x))) -- yaw
+                                            updateControllable :: Solvable -> Solvable
+                                            updateControllable slv0 = case slv0 of
+                                              Controllable cvel0 cypr0 cyprS0 ->
+                                                Controllable
+                                                { cvel  = 0.01 * keyboardTS cam * cvel0 -- TODO: replace with mouse-specific acceleration sensitivity, rename to "innertia" or smth.
+                                                , cypr  = 0.01 * keyboardRS cam * V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
+                                                , cyprS = 0.01 * keyboardRS cam * V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0 + cyprS0
+                                                }
+                                              _ -> slv0
 
                 updateKeyboard :: (Monad m) => [((Scancode, InputMotion, Bool), m ())] -> [Event] -> m ()
                 updateKeyboard emap = mapM_ (processEvent emap)

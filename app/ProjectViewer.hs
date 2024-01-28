@@ -65,26 +65,26 @@ initProject resx' resy' =
       , modelIDXs      = [2]
       , tsolvers       =
         [ Identity
-        , Controllable
-          { cvel   = (V3 0 0 0) -- velocity
-          , cypr   = (V3 0 0 0) -- rotation
-          , cyprS  = (V3 0 0 0) -- sum of rotations
-          }
+        -- , Controllable
+        --   { cvel   = (V3 0 0 0) -- velocity
+        --   , cypr   = (V3 0 0 0) -- rotation
+        --   , cyprS  = (V3 0 0 0) -- sum of rotations
+        --   }
         , Movable
           { space  = WorldSpace
-          , txyz   = V3 0 0 0
-          , tvel   = V3 0 0 0
+          , txyz   = V3 4 0 0
+          , tvel   = V3 0 0.014 0
           , kinslv = [] }
-        -- , Turnable
-        --   { space  = WorldSpace
-        --   , cxyz   = V3 0 0 0
-        --   , rord   = XYZ
-        --   , rxyz   = V3 0 (0) 0
-        --   , avel   = V3 0 0 0
-        --   , kinslv = [] }
-        -- , Attractable
-        --   { mass = 1000.0
-        --   , acc  = V3 0 0 0 }
+        , Turnable
+          { space  = WorldSpace
+          , cxyz   = V3 0 0 0
+          , rord   = XYZ
+          , rxyz   = V3 0 (pi/2) 0
+          , avel   = V3 0 0 0
+          , kinslv = [] }
+        , Attractable
+          { mass = 1000.0
+          , acc  = V3 0 0 0 }
         ]
       , posolvers      =
         [ Identity
