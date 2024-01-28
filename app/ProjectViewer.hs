@@ -24,7 +24,7 @@ import Graphics.RedViz.Game
 import Graphics.RedViz.Material as R
 import Graphics.RedViz.Project
 import Graphics.RedViz.Rendering 
-import Graphics.RedViz.Solvable
+import Graphics.RedViz.Solvable as S
 import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Transformable
 import Graphics.RedViz.Widget
@@ -65,21 +65,26 @@ initProject resx' resy' =
       , modelIDXs      = [2]
       , tsolvers       =
         [ Identity
+        , Controllable
+          { cvel   = (V3 0 0 0) -- velocity
+          , cypr   = (V3 0 0 0) -- rotation
+          , cyprS  = (V3 0 0 0) -- sum of rotations
+          }
         , Movable
           { space  = WorldSpace
-          , txyz   = V3 4 0 0
-          , tvel   = V3 0 0.014 0
+          , txyz   = V3 0 0 0
+          , tvel   = V3 0 0 0
           , kinslv = [] }
-        , Turnable
-          { space  = WorldSpace
-          , cxyz   = V3 0 0 0
-          , rord   = XYZ
-          , rxyz   = V3 0 (pi/2) 0
-          , avel   = V3 0 0 0
-          , kinslv = [] }
-        , Attractable
-          { mass = 1000.0
-          , acc  = V3 0 0 0 }
+        -- , Turnable
+        --   { space  = WorldSpace
+        --   , cxyz   = V3 0 0 0
+        --   , rord   = XYZ
+        --   , rxyz   = V3 0 (0) 0
+        --   , avel   = V3 0 0 0
+        --   , kinslv = [] }
+        -- , Attractable
+        --   { mass = 1000.0
+        --   , acc  = V3 0 0 0 }
         ]
       , posolvers      =
         [ Identity
@@ -195,6 +200,7 @@ playCam =
         }
       , Parentable { parent = nil }
       ]
+      -- [ S.Constant ]
     }
   , mouseS     = -0.0025
   , keyboardRS = 0.05

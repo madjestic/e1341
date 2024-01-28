@@ -81,7 +81,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   solveTransformable :: Entity -> Transformable -> Transformable
                   solveTransformable obj0 t0 = -- DT.trace ("tslvrs t0 :" ++ show (tslvrs t0)) $
-                    t0 { xform  = foldr1 (!*!) $ solveXform (parentXform $ xform t0) <$> tslvrs t0
+                    t0 { xform  = foldl1 (!*!) $ solveXform (parentXform $ xform t0) <$> tslvrs t0
                        , tslvrs = updateSolver <$> tslvrs t0 }
                     where
                       parentXform :: M44 Double -> M44 Double
@@ -102,6 +102,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       solveXform mtx0 slv =
                         case slv of
                           Identity -> identity
+                          Constant -> mtx0
                           Movable cs pos _ _ ->
                             case cs of
                               WorldSpace  -> identity & translation .~ pos
@@ -125,7 +126,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                             !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
                                       tr     = (identity::M44 Double)^.translation
                    
-                          Controllable cvel0 ypr0 _ ->
+                          Controllable cvel0 ypr0 _ -> 
                             mkTransformationMat rot tr
                             where
                               rot = 
