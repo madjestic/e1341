@@ -81,7 +81,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   solveTransformable :: Entity -> Transformable -> Transformable
                   solveTransformable obj0 t0 = -- DT.trace ("tslvrs t0 :" ++ show (tslvrs t0)) $
-                    t0 { xform  = foldl1 (!*!) $ solveXform (parentXform $ xform t0) <$> tslvrs t0
+                    t0 { xform  = foldl1 (!*!) $ xformSolver (parentXform $ xform t0) <$> tslvrs t0
                        , tslvrs = updateSolver <$> tslvrs t0 }
                     where
                       parentXform :: M44 Double -> M44 Double
@@ -98,8 +98,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           parentables :: [Solvable]
                           parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform obj0) ])
                                          
-                      solveXform :: M44 Double -> Solvable -> M44 Double
-                      solveXform mtx0 slv =
+                      xformSolver :: M44 Double -> Solvable -> M44 Double
+                      xformSolver mtx0 slv =
                         case slv of
                           Identity -> identity
                           Constant -> mtx0
@@ -186,12 +186,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                           _ -> slv                  
  
-                      updateVel :: Solvable -> Solvable -> V3 Double -> V3 Double
-                      updateVel _ slv1 v0 =
-                        case slv1 of
-                          Fadable l a _ amp f -> amp * f (l-a) *^ v0
-                          _ -> v0
-
           updateWidgets :: StateT Game IO ()
           updateWidgets = do
             modify solveWidgets
@@ -404,7 +398,11 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera cam  = -- DT.trace ("transform cam : " ++ show (transform cam)) $
                               cam { E.parent  = uid
                                   , parented  = not $ parented cam
-                                  , transform = if not $ parented cam then (transform cam) *!* (transform $ head parents) else transform cam}
+                                  , transform =
+                                    if (not . parented $ cam) && (not . null $ parents)
+                                      then (transform cam) *!* (transform $ head parents)
+                                      else transform cam
+                                  }
                               where
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
@@ -479,7 +477,7 @@ stepOnce = modify gameObjects
           where
             solveTransformable :: Transformable -> Transformable
             solveTransformable t0 =
-              t0 { xform  = foldr1 (!*!) $ solveXform (xform t0) <$> tslvrs t0
+              t0 { xform  = foldr1 (!*!) $ xformSolver (xform t0) <$> tslvrs t0
                  , tslvrs = updateSolver <$> tslvrs t0 }
               where
                 updateSolver :: Solvable -> Solvable
@@ -492,8 +490,8 @@ stepOnce = modify gameObjects
                       slv { rxyz   = rxyz }
                     _ -> slv                                                        
              
-                solveXform :: M44 Double -> Solvable -> M44 Double
-                solveXform mtx0 slv =
+                xformSolver :: M44 Double -> Solvable -> M44 Double
+                xformSolver mtx0 slv =
                   case slv of
                     Identity -> identity
                     Movable cs pos _ _ ->
