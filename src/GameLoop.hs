@@ -18,7 +18,7 @@ import SDL hiding (Texture, normalize)
 import Unsafe.Coerce
 
 import Graphics.RedViz.Entity as E
-import Graphics.RedViz.Game
+import Graphics.RedViz.Game as G
 import Graphics.RedViz.Solvable as S
 import Graphics.RedViz.Transformable
 import Graphics.RedViz.Uniforms
@@ -33,7 +33,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
     gameQuit = arrM (\_ -> (lift . lift . lift) gameQuit')
 
     gameQuit' :: StateT Game IO Bool
-    gameQuit' = TMSF.get >>= \s -> return $ quitGame s
+    gameQuit' = TMSF.get >>= \s -> return $ G.quit s
 
     gameLoopStep :: ReaderT Double (StateT Game IO) Bool
     gameLoopStep = do
@@ -62,13 +62,13 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
               gameEntities :: Game -> Game
               gameEntities g0 =
-                g0 { objs    = updateObject <$> objs g0
-                   , cameras = updateCamera <$> cameras g0 }
+                g0 { objs = updateObject <$> objs g0
+                   , cams = updateCamera <$> cams g0 }
                 where
                   updateObject :: Object -> Object
                   updateObject obj0 = -- DT.trace ("obj0 :" ++ show obj0) $
                     obj0 { transform = solveTransformable obj0 (transform obj0)
-                         , selected  = lookedAt (head $ cameras g0) (xform (transform obj0)^.translation) 0.1 }
+                         , selected  = lookedAt (head $ cams g0) (xform (transform obj0)^.translation) 0.1 }
                   updateCamera :: Camera -> Camera
                   updateCamera cam0 =
                     cam0 { transform = solveTransformable cam0 (transform cam0) }
@@ -126,7 +126,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                             !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
                                       tr     = (identity::M44 Double)^.translation
                    
-                          Controllable cvel0 ypr0 _ -> 
+                          Controllable cvel0 ypr0 _ -> --DT.trace ("Controllable : " ++ show cvel0 ++ " " ++ show ypr0) $
                             mkTransformationMat rot tr
                             where
                               rot = 
@@ -236,18 +236,18 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             _ -> Nothing
                       in case mk of
                         Nothing   -> return ()
-                        Just vpos ->
-                          mmove (unsafeCoerce vpos)
+                        Just vpos -> callBack (unsafeCoerce vpos)
                           where
-                            mmove :: Point V2 CInt -> StateT Game IO ()
-                            mmove pos = do
-                              modify $ mmove'
+                            callBack :: Point V2 CInt -> StateT Game IO ()
+                            callBack pos = do
+                              modify $ updateControllables
                               where
-                                mmove' :: Game -> Game
-                                mmove' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : tail (cameras g0) }
+                                updateControllables :: Game -> Game
+                                updateControllables g0 = g0 { cams = (updateEntity $ head (cams g0)) : tail (cams g0)
+                                                            , objs = (updateEntity <$> objs g0) }
                                   where
-                                    updateCamera :: Camera -> Camera
-                                    updateCamera cam =
+                                    updateEntity :: Entity -> Entity
+                                    updateEntity cam =
                                       cam { transform = updateTransformable pos (transform cam)}
                                       where
                                         updateTransformable :: Point V2 CInt -> Transformable -> Transformable
@@ -342,7 +342,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlDolly n = modify camDolly'
                       where
                         camDolly' :: Game -> Game
-                        camDolly' g0 = g0 { cameras = updateCamera (head $ cameras g0) : tail (cameras g0) }
+                        camDolly' g0 = g0 { cams = updateCamera (head $ cams g0) : tail (cams g0) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
@@ -356,7 +356,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlTruck n = modify $ camTruck'
                       where
                         camTruck' :: Game -> Game
-                        camTruck' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camTruck' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
@@ -370,7 +370,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlPedestal n = modify $ camPedestal'
                       where
                         camPedestal' :: Game -> Game
-                        camPedestal' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camPedestal' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
@@ -384,7 +384,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlRoll n = modify $ camRoll'
                       where
                         camRoll' :: Game -> Game
-                        camRoll' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camRoll' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
@@ -398,7 +398,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlParent False = modify $ camParent'
                       where
                         camParent' :: Game -> Game
-                        camParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camParent' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam  = -- DT.trace ("transform cam : " ++ show (transform cam)) $
@@ -433,7 +433,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlParent True = modify $ camParent'
                       where
                         camParent' :: Game -> Game
-                        camParent' g0 = g0 { cameras = (updateCamera $ head (cameras g0)) : (tail (cameras g0)) }
+                        camParent' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
@@ -453,7 +453,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     quitE b = modify $ quit' b
                       where
                         quit' :: Bool -> Game -> Game
-                        quit' b' gameLoopDelay' = gameLoopDelay' { quitGame = b' }
+                        quit' b' gameLoopDelay' = gameLoopDelay' { quit = b' }
 
           updateTick :: Double -> StateT Game IO ()
           updateTick n = modify $ inc'
@@ -461,7 +461,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
               inc' :: Game -> Game
               inc' g0 = g0
                 { tick = tick g0 + n 
-                , uniforms = incUnis (uniforms g0) }
+                , unis = incUnis (unis g0) }
                 where
                   incUnis :: Uniforms -> Uniforms
                   incUnis unis0 = 

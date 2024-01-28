@@ -65,26 +65,26 @@ initProject resx' resy' =
       , modelIDXs      = [2]
       , tsolvers       =
         [ Identity
-        -- , Controllable
-        --   { cvel   = (V3 0 0 0) -- velocity
-        --   , cypr   = (V3 0 0 0) -- rotation
-        --   , cyprS  = (V3 0 0 0) -- sum of rotations
-        --   }
-        , Movable
-          { space  = WorldSpace
-          , txyz   = V3 4 0 0
-          , tvel   = V3 0 0.014 0
-          , kinslv = [] }
-        , Turnable
-          { space  = WorldSpace
-          , cxyz   = V3 0 0 0
-          , rord   = XYZ
-          , rxyz   = V3 0 (pi/2) 0
-          , avel   = V3 0 0 0
-          , kinslv = [] }
-        , Attractable
-          { mass = 1000.0
-          , acc  = V3 0 0 0 }
+        , Controllable
+          { cvel   = (V3 0 0 0) -- velocity
+          , cypr   = (V3 0 0 0) -- rotation
+          , cyprS  = (V3 0 0 0) -- sum of rotations
+          }
+        -- , Movable
+        --   { space  = WorldSpace
+        --   , txyz   = V3 4 0 0
+        --   , tvel   = V3 0 0.014 0
+        --   , kinslv = [] }
+        -- , Turnable
+        --   { space  = WorldSpace
+        --   , cxyz   = V3 0 0 0
+        --   , rord   = XYZ
+        --   , rxyz   = V3 0 (pi/2) 0
+        --   , avel   = V3 0 0 0
+        --   , kinslv = [] }
+        -- , Attractable
+        --   { mass = 1000.0
+        --   , acc  = V3 0 0 0 }
         ]
       , posolvers      =
         [ Identity
@@ -192,13 +192,13 @@ playCam =
   , transform  =
     defaultCamTransformable
     { tslvrs   =
-      [ Identity
-      , Controllable
-        { cvel   = (V3 0 0 0) -- velocity
-        , cypr   = (V3 0 0 0) -- rotation
-        , cyprS  = (V3 0 0 0) -- sum of rotations
-        }
-      , Parentable { parent = nil }
+      [ S.Constant --Identity
+      -- , Controllable
+      --   { cvel   = (V3 0 0 0) -- velocity
+      --   , cypr   = (V3 0 0 0) -- rotation
+      --   , cyprS  = (V3 0 0 0) -- sum of rotations
+      --   }
+      -- , Parentable { parent = nil }
       ]
       -- [ S.Constant ]
     }
@@ -220,7 +220,7 @@ animate :: Window
         -> IO ()
 animate window dt gs g sf = do
   reactimateB $ input >>> sfIO >>> output window
-  quit
+  SDL.quit
   where
     input    = arr (const (dt, (gs, ())))                            :: MSF IO b (DTime, (GameSettings, ()))
     sfIO     = runStateS_ (runReaderS (runReaderS (runMaybeS sf))) g :: MSF IO   (DTime, (GameSettings, ())) (Game, Maybe Bool)
@@ -280,11 +280,11 @@ main = do
     (_, initGame') = runState stepOnce $
       initGame
       { 
-        objs      = objs'
-      , cameras   = pcameras prj
-      , uniforms =
+        objs = objs'
+      , cams = pcameras prj
+      , unis =
           defaultUniforms
-          { u_res   = (resX', resY') }
+          { u_res = (resX', resY') }
       , wgts =
         [ Cursor
           { active = True
