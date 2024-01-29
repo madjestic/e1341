@@ -87,8 +87,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       parentXform :: M44 Double -> M44 Double
                       parentXform mtx0 =
                         --if (not . null $ parentables) && (not . null $ parents) && (E.parent obj0 /= nil)
-                        if (not . null $ parentables) && (not . null $ parents) && parented obj0
-
+                        if (not . null $ parentables) && (not . null $ parents) && (parented . head $ parentables)
                         then (xform . transform $ obj0)&translation .~ (xform . transform . head $ parents)^.translation
                         else mtx0
                         where
@@ -97,7 +96,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                           parentables :: [Solvable]
                           parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform obj0) ])
-                                         
+
                       xformSolver :: M44 Double -> Solvable -> M44 Double
                       xformSolver mtx0 slv =
                         case slv of
@@ -179,7 +178,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         _  -> (f / m0) *^ (dir ^/ dist)
                                     -- | F = G*@mass*m2/(dist^2);       // Newton's attract equation
                                     -- | a += (F/@mass)*normalize(dir); // Acceleration
-                          Parentable _ -> -- DT.trace ("Parentable :" ++ show slv) $
+                          Parentable {} -> -- DT.trace ("Parentable :" ++ show slv) $
                             slv { S.parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
                             where
                               activeObjs = [x | x <- filter E.active $ objs g0]
@@ -397,18 +396,32 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera :: Camera -> Camera
                             updateCamera cam  = -- DT.trace ("transform cam : " ++ show (transform cam)) $
                               cam { E.parent  = uid
-                                  , parented  = not $ parented cam
+                                  --, parented  = not . parented . head $ parentables
                                   , transform =
-                                    if (not . parented $ cam) && (not . null $ parents)
+                                    if (not . null $ parents) && (not . parented . head $ parentables)
                                       then (transform cam) *!* (transform $ head parents)
-                                      else transform cam
-                                  }
+                                      else transform cam }
                               where
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
 
+                                parentables :: [Solvable] -- TODO: move parentables to Solvable?
+                                parentables = [ x | x@(Parentable {} ) <- tslvrs (transform cam) ]
+
                                 (*!*) :: Transformable -> Transformable -> Transformable
-                                (*!*) t0 t1 = t0 {xform = rotY (xform t1) } -- !*! (inv44 . xform $ t1)}
+                                (*!*) t0 t1 = t0 { xform  = rotY (xform t1)
+                                                 , tslvrs = updateParentables (head . parentables' $ t1) (tslvrs t0) } -- !*! (inv44 . xform $ t1)}
+                                  where
+                                    parentables' :: Transformable -> [Solvable] -- TODO: move parentables to Solvable?
+                                    parentables' t0 = [ x | x@(Parentable {} ) <- tslvrs t0 ]
+
+                                    updateParentables :: Solvable -> [Solvable] -> [Solvable]
+                                    updateParentables slv0 slvs = updateParentable slv0 <$> slvs
+                                      where
+                                        updateParentable :: Solvable -> Solvable -> Solvable
+                                        updateParentable slv0 slv1 = case slv1 of
+                                          Parentable{} -> slv1 { parented = parented slv0 }
+                                          _ -> slv1
 
                                 rotY :: M44 Double -> M44 Double
                                 rotY mtx0 = mtx !*! mtx0
@@ -425,7 +438,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         tr  = mtx0'^.translation
                                         mtx0' = identity :: M44 Double
 
-                                Parentable uid = if not . null $ parentables then head parentables else Parentable nil
+                                Parentable uid p = if not . null $ parentables then head parentables else Parentable nil p
                                   where parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                                  
 
                     ctrlParent True = modify $ camParent'
@@ -435,13 +448,20 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
-                              cam { E.parent = uid
-                                  , parented = True }
+                              -- cam { E.parent = uid
+                              --     , parented = True }
+                              cam { E.parent  = uid
+                                  , transform = (transform cam ){ tslvrs = updateParentable True <$> (tslvrs . transform $ cam)} }
                               where
+                                updateParentable :: Bool -> Solvable -> Solvable
+                                updateParentable b0 slv0 = case slv0 of
+                                  Parentable{} -> slv0{ parented = b0 }
+                                  _ -> slv0
+
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
 
-                                Parentable uid = if not . null $ parentables then head parentables else Parentable nil
+                                Parentable uid p = if not . null $ parentables then head parentables else Parentable nil p
                                 parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                  
 
                     ctrlUnParent :: StateT Game IO ()
