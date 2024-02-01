@@ -18,9 +18,8 @@ import SDL hiding (Texture, normalize)
 import Unsafe.Coerce
 
 import Graphics.RedViz.Entity as E
+import Graphics.RedViz.Component as C
 import Graphics.RedViz.Game as G
-import Graphics.RedViz.Solvable as S
-import Graphics.RedViz.Transformable
 import Graphics.RedViz.Uniforms
 import Graphics.RedViz.Widget as W
 
@@ -54,52 +53,58 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
               lookedAt :: Camera -> V3 Double -> Double -> Bool
               lookedAt cam centroid radius = s
                 where
-                  cxform          = xform . transform $ cam
-                  camera_position = (xform . transform $ cam)^.translation
+                  cxform          = xform  . transformable $ cam
+                  camera_position = (xform . transformable $ cam)^.translation
                   camera_lookat   = V3 0 0 (-1) *! cxform^._m33
                   ivec            = normalize $ centroid - camera_position :: V3 Double
                   s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
               gameEntities :: Game -> Game
               gameEntities g0 =
-                g0 { objs = updateObject <$> objs g0
-                   , cams = updateCamera <$> cams g0 }
+                g0 { objs = updateEntity <$> objs g0
+                   , cams = updateEntity <$> cams g0 }
                 where
-                  updateObject :: Object -> Object
-                  updateObject obj0 = -- DT.trace ("obj0 :" ++ show obj0) $
-                    obj0 { transform = solveTransformable obj0 (transform obj0)
-                         , selected  = lookedAt (head $ cams g0) (xform (transform obj0)^.translation) 0.1 }
-                  updateCamera :: Camera -> Camera
-                  updateCamera cam0 =
-                    cam0 { transform = solveTransformable cam0 (transform cam0) }
+                  updateEntity :: Entity -> Entity
+                  updateEntity e0 = -- DT.trace ("e0 :" ++ show e0) $
+                    e0{ cmps = updateComponent <$> cmps e0}
+                    where
+                      updateComponent cmp = case cmp of
+                        Transformable{}   -> solveTransformable e0 cmp
+                        s@Selectable{}      -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ e0)^.translation) 0.1}
+                        _ -> cmp
+                    -- e0 { transform = solveTransformable e0 (transformable e0)
+                    --      , selected  = lookedAt (head $ cams g0) (xform (transform obj0)^.translation) 0.1 }
+                  -- updateCamera :: Camera -> Camera
+                  -- updateCamera cam0 =
+                  --   cam0 { transform = solveTransformable cam0 (transform cam0) }
 
-                  (<>) :: Solvable -> Solvable -> Solvable
-                  (<>) slv0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = slv0 { tvel = amp * f (l-a) *^ v0 }
-                  (<>) slv0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = slv0 { avel = amp * f (l-a) *^ av0 }
-                  (<>) slv0@(Movable _ _ v0 _)       (Attractable _ a)     = slv0 { tvel = v0 + a }  -- a*dt?
-                  (<>) slv0 _ = slv0
+                  (<>) :: Component -> Component -> Component
+                  (<>) cmp0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }
+                  (<>) cmp0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = cmp0 { avel = amp * f (l-a) *^ av0 }
+                  (<>) cmp0@(Movable _ _ v0 _)       (Attractable _ a)     = cmp0 { tvel = v0 + a }  -- a*dt?
+                  (<>) cmp0 _ = cmp0
 
-                  solveTransformable :: Entity -> Transformable -> Transformable
+                  solveTransformable :: Entity -> Component -> Component
                   solveTransformable obj0 t0 = -- DT.trace ("tslvrs t0 :" ++ show (tslvrs t0)) $
                     t0 { xform  = foldl1 (!*!) $ xformSolver (parentXform $ xform t0) <$> tslvrs t0
-                       , tslvrs = updateSolver <$> tslvrs t0 }
+                       , tslvrs = updateComponent <$> tslvrs t0 }
                     where
                       parentXform :: M44 Double -> M44 Double
                       parentXform mtx0 =
                         --if (not . null $ parentables) && (not . null $ parents) && (E.parent obj0 /= nil)
                         if (not . null $ parentables) && (not . null $ parents) && (parented . head $ parentables)
-                        then (xform . transform $ obj0)&translation .~ (xform . transform . head $ parents)^.translation
+                        then (xform . transformable $ obj0)&translation .~ (xform . transformable . head $ parents)^.translation
                         else mtx0
                         where
                           parents :: [Object]
-                          parents = filter (\o -> uuid o == E.parent obj0) (objs g0)
+                          parents = filter (\o -> uuid o == (parent . parentable $ obj0)) (objs g0)
 
-                          parentables :: [Solvable]
-                          parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform obj0) ])
+                          parentables :: [Component]
+                          parentables = ([ x | x@(Parentable {} ) <- tslvrs (transformable obj0) ])
 
-                      xformSolver :: M44 Double -> Solvable -> M44 Double
-                      xformSolver mtx0 slv =
-                        case slv of
+                      xformSolver :: M44 Double -> Component -> M44 Double
+                      xformSolver mtx0 cmp =
+                        case cmp of
                           Identity -> identity
                           Constant -> mtx0
                           Movable cs pos _ _ ->
@@ -125,7 +130,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                             !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
                                       tr     = (identity::M44 Double)^.translation
                    
-                          Controllable cvel0 ypr0 _ -> --DT.trace ("Controllable : " ++ show cvel0 ++ " " ++ show ypr0) $
+                          Controllable cvel0 ypr0 _ _ _ _ -> --DT.trace ("Controllable : " ++ show cvel0 ++ " " ++ show ypr0) $
                             mkTransformationMat rot tr
                             where
                               rot = 
@@ -138,21 +143,21 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           Parentable {} -> identity
                           _ -> identity
 
-                      updateSolver :: Solvable -> Solvable
-                      updateSolver slv = -- DT.trace ("slv :" ++ show slv) $
-                        case slv of
-                          Identity             -> slv
+                      updateComponent :: Component -> Component
+                      updateComponent cmp = -- DT.trace ("cmp :" ++ show cmp) $
+                        case cmp of
+                          Identity             -> cmp
                           Movable _ pos vel0 ss   ->
-                            slv { txyz   = pos  + vel0
-                                , tvel   = tvel (foldl (<>) slv (ss ++ (tslvrs.transform $ obj0)))
-                                , kinslv = updateSolver <$> ss}
+                            cmp { txyz   = pos  + vel0
+                                , tvel   = tvel (foldl (<>) cmp (ss ++ (tslvrs.transformable $ obj0)))
+                                , kinslv = updateComponent <$> ss}
                           Turnable _ _ _ rxyz avel0 ss ->
-                            slv { rxyz   = rxyz + avel0
-                                , avel   = avel (foldl (<>) slv (ss ++ (tslvrs.transform $ obj0)))
-                                , kinslv  = updateSolver <$> ss }
+                            cmp { rxyz   = rxyz + avel0
+                                , avel   = avel (foldl (<>) cmp (ss ++ (tslvrs.transformable $ obj0)))
+                                , kinslv  = updateComponent <$> ss }
                           Fadable l a inc _ _ ->
-                            slv { age    = min (a + inc) l}
-                          Attractable m0 _ -> slv { acc = gravity }
+                            cmp { age    = min (a + inc) l}
+                          Attractable m0 _ -> cmp { acc = gravity }
                             where 
                               gravity :: V3 Double
                               gravity =
@@ -165,10 +170,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   attract obj0 obj1 acc0 = -- DT.trace ("obj0 :" ++ show obj0) $
                                     acc0 + acc'
                                     where
-                                      attractables = ([ x | x@(Attractable {} ) <- tslvrs (transform obj1) ])
+                                      attractables = ([ x | x@(Attractable {} ) <- tslvrs (transformable obj1) ])
                                       Attractable m1 _  = if not.null $ attractables then head attractables else Attractable 0 (V3 0 0 0)
-                                      p0   = (xform.transform $ obj0)^.translation
-                                      p1   = (xform.transform $ obj1)^.translation
+                                      p0   = (xform.transformable $ obj0)^.translation
+                                      p1   = (xform.transformable $ obj1)^.translation
                                       dir  = p1 ^-^ p0                 :: V3 Double
                                       dist = norm dir                  :: Double
                                       g    = 6.673**(-11.0)            :: Double
@@ -178,12 +183,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         _  -> (f / m0) *^ (dir ^/ dist)
                                     -- | F = G*@mass*m2/(dist^2);       // Newton's attract equation
                                     -- | a += (F/@mass)*normalize(dir); // Acceleration
-                          Parentable {} -> -- DT.trace ("Parentable :" ++ show slv) $
-                            slv { S.parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
+                          Parentable {} -> -- DT.trace ("Parentable :" ++ show cmp) $
+                            cmp { parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
                             where
-                              activeObjs = [x | x <- filter E.active $ objs g0]
+                              activeObjs = filter (C.active . renderable) $ objs g0
 
-                          _ -> slv                  
+                          _ -> cmp                  
  
           updateWidgets :: StateT Game IO ()
           updateWidgets = do
@@ -198,7 +203,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     widgetSolver wgt =
                       case wgt of
                         Selector {} ->
-                          wgt { objects = filter selected $ objs g0 }
+                          wgt { objects = filter (selected . selectable) $ objs g0 }
                         _ -> wgt
           
           handleEvents :: StateT Game IO Bool
@@ -240,21 +245,29 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                                             , objs = (updateEntity <$> objs g0) }
                                   where
                                     updateEntity :: Entity -> Entity
-                                    updateEntity cam =
-                                      cam { transform = updateTransformable pos (transform cam)}
+                                    updateEntity e0 =
+                                      --e0 { transform = updateTransformable pos (transform e0)}
+                                      e0 { cmps = updateTransformable pos <$> cmps e0 }--updateTransformable pos (transformable e0)}
                                       where
-                                        updateTransformable :: Point V2 CInt -> Transformable -> Transformable
+                                        -- updateComponent :: Component -> Component
+                                        -- updateComponent = case cmp of
+                                        --   Transformable{} -> updateTransformable pos (transformable e0)
+                                        --   _ -> cmp
+                                        --where
+                                        updateTransformable :: Point V2 CInt -> Component -> Component
                                         updateTransformable pos t0@(Transformable _ slvrs0) = t0 { tslvrs = updateControllable <$> tslvrs t0 }
                                           where
-                                            updateControllable :: Solvable -> Solvable
-                                            updateControllable slv0 = case slv0 of
-                                              Controllable cvel0 cypr0 cyprS0 ->
-                                                Controllable
-                                                { cvel  = 0.01 * keyboardTS cam * cvel0 -- TODO: replace with mouse-specific acceleration sensitivity, rename to "innertia" or smth.
-                                                , cypr  = 0.01 * keyboardRS cam * V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
-                                                , cyprS = 0.01 * keyboardRS cam * V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0 + cyprS0
+                                            updateControllable :: Component -> Component
+                                            updateControllable cmp0 = case cmp0 of
+                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS ->
+                                                cmp0
+                                                { cvel  = 0.01 * keyboardTS *^ cvel0
+                                                , cypr  = 0.01 * keyboardRS *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
+                                                , cyprS = 0.01 * keyboardRS *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0 + cyprS0
                                                 }
-                                              _ -> slv0
+                                              _ -> cmp0
+                                        updateTransformable _ cmp = cmp
+
 
                 updateKeyboard :: (Monad m) => [((Scancode, InputMotion, Bool), m ())] -> [Event] -> m ()
                 updateKeyboard emap = mapM_ (processEvent emap)
@@ -320,15 +333,15 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     updateController :: Entity
                                      -> V3 Double
                                      -> V3 Double
-                                     -> Solvable
-                                     -> Solvable
-                    updateController obj vel0 ypr0 slv0 = 
-                        case slv0 of
-                          ctrl@(Controllable _ _ cyprS) ->
-                            ctrl { cvel  = keyboardTS obj * vel0
-                                 , cypr  = keyboardRS obj * ypr0
-                                 , cyprS = keyboardRS obj * ypr0 + cyprS } 
-                          _ -> slv0
+                                     -> Component
+                                     -> Component
+                    updateController obj vel0 ypr0 cmp0 = 
+                        case cmp0 of
+                          ctrl@(Controllable _ _ cyprS _ keyboardRS keyboardTS) -> -- Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS ->
+                            ctrl { cvel  = keyboardTS *^ vel0
+                                 , cypr  = keyboardRS *^ ypr0
+                                 , cyprS = keyboardRS *^ ypr0 + cyprS } 
+                          _ -> cmp0
 
 
                     ctrlDolly :: Integer -> StateT Game IO ()
@@ -339,11 +352,13 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { transform = updateSolvers (transform cam)}
+                              --cam { transform = updateComponents (transform cam)}
+                              cam { cmps = updateComponent <$> cmps cam}
                               where
-                                updateSolvers :: Transformable -> Transformable
-                                updateSolvers t0 =
+                                updateComponent :: Component -> Component
+                                updateComponent t0@(Transformable{}) =
                                   t0 { tslvrs = updateController (cam) (V3 0 0 (fromIntegral n)) (V3 0 0 0) <$> tslvrs t0}
+                                updateComponent cmp = cmp
                                     
                     ctrlTruck :: Integer -> StateT Game IO ()
                     ctrlTruck n = modify $ camTruck'
@@ -353,11 +368,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { transform = updateSolvers (transform cam)}
+                              cam { cmps = updateComponent <$> cmps cam }
                               where
-                                updateSolvers :: Transformable -> Transformable
-                                updateSolvers t0 =
+                                updateComponent :: Component -> Component
+                                updateComponent t0@(Transformable {}) =
                                   t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
+                                updateComponent cmp = cmp
                                     
                     ctrlPedestal :: Integer -> StateT Game IO ()
                     ctrlPedestal n = modify $ camPedestal'
@@ -367,11 +383,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { transform = updateSolvers (transform cam)}
+                              cam { cmps = updateComponent <$> cmps cam}
                               where
-                                updateSolvers :: Transformable -> Transformable
-                                updateSolvers t0 =
+                                updateComponent :: Component -> Component
+                                updateComponent t0@(Transformable {}) =
                                   t0 { tslvrs = updateController cam (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs t0}
+                                updateComponent cmp = cmp
 
                     ctrlRoll :: Integer -> StateT Game IO ()
                     ctrlRoll n = modify $ camRoll'
@@ -381,11 +398,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam =
-                              cam { transform = updateSolvers (transform cam)}
+                              cam { cmps = updateComponent <$> cmps cam }
                               where
-                                updateSolvers :: Transformable -> Transformable
-                                updateSolvers t0 =
+                                updateComponent :: Component -> Component
+                                updateComponent t0@(Transformable {}) =
                                   t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
+                                updateComponent cmp = cmp
 
                     ctrlParent :: Bool -> StateT Game IO ()
                     ctrlParent False = modify $ camParent'
@@ -395,32 +413,41 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           where
                             updateCamera :: Camera -> Camera
                             updateCamera cam  = -- DT.trace ("transform cam : " ++ show (transform cam)) $
-                              cam { E.parent  = uid
-                                  --, parented  = not . parented . head $ parentables
-                                  , transform =
-                                    if (not . null $ parents) && (not . parented . head $ parentables)
-                                      then (transform cam) *!* (transform $ head parents)
-                                      else transform cam }
+                              cam { cmps = updateComponent <$> cmps cam } --E.parent  = uid
+                                  -- , transform =
+                                  --   if (not . null $ parents) && (not . parented . head $ parentables)
+                                  --     then (transform cam) *!* (transform $ head parents)
+                                  --     else transform cam }
                               where
+                                updateComponent :: Component -> Component
+                                updateComponent p@(Parentable {}) =
+                                  p { parent   = uid
+                                    , parented = not . parented . head $ parentables }
+                                updateComponent t@(Transformable {}) =
+                                    if (not . null $ parents) && (not . parented . head $ parentables)
+                                      then (transformable cam) *!* (transformable . head $ parents)
+                                      else transformable cam 
+                                updateComponent cmp = cmp
+
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
 
-                                parentables :: [Solvable] -- TODO: move parentables to Solvable?
-                                parentables = [ x | x@(Parentable {} ) <- tslvrs (transform cam) ]
+                                parentables :: [Component] -- TODO: move parentables to Component?
+                                parentables = [ x | x@(Parentable {} ) <- tslvrs (transformable cam) ]
 
-                                (*!*) :: Transformable -> Transformable -> Transformable
+                                (*!*) :: Component -> Component -> Component
                                 (*!*) t0 t1 = t0 { xform  = rotY (xform t1)
                                                  , tslvrs = updateParentables (head . parentables' $ t1) (tslvrs t0) } -- !*! (inv44 . xform $ t1)}
                                   where
-                                    parentables' :: Transformable -> [Solvable] -- TODO: move parentables to Solvable?
+                                    parentables' :: Component -> [Component] -- TODO: move parentables to Component?
                                     parentables' t0 = [ x | x@(Parentable {} ) <- tslvrs t0 ]
 
-                                    updateParentables :: Solvable -> [Solvable] -> [Solvable]
-                                    updateParentables slv0 slvs = updateParentable slv0 <$> slvs
+                                    updateParentables :: Component -> [Component] -> [Component]
+                                    updateParentables cmp0 slvs = updateParentable cmp0 <$> slvs
                                       where
-                                        updateParentable :: Solvable -> Solvable -> Solvable
-                                        updateParentable slv0 slv1 = case slv1 of
-                                          Parentable{} -> slv1 { parented = parented slv0 }
+                                        updateParentable :: Component -> Component -> Component
+                                        updateParentable cmp0 slv1 = case slv1 of
+                                          Parentable{} -> slv1 { parented = parented cmp0 }
                                           _ -> slv1
 
                                 rotY :: M44 Double -> M44 Double
@@ -439,7 +466,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         mtx0' = identity :: M44 Double
 
                                 Parentable uid p = if not . null $ parentables then head parentables else Parentable nil p
-                                  where parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                                  
+                                  where parentables = ([ x | x@(Parentable {} ) <- tslvrs (transformable cam) ])                                  
 
                     ctrlParent True = modify $ camParent'
                       where
@@ -450,19 +477,27 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
                               -- cam { E.parent = uid
                               --     , parented = True }
-                              cam { E.parent  = uid
-                                  , transform = (transform cam ){ tslvrs = updateParentable True <$> (tslvrs . transform $ cam)} }
+                              -- cam { E.parent  = uid
+                              --     , transform = (transform cam ){ tslvrs = updateParentable True <$> (tslvrs . transform $ cam)} }
+                              cam { cmps = updateComponent <$> cmps cam }
                               where
-                                updateParentable :: Bool -> Solvable -> Solvable
-                                updateParentable b0 slv0 = case slv0 of
-                                  Parentable{} -> slv0{ parented = b0 }
-                                  _ -> slv0
+                                updateComponent :: Component -> Component
+                                updateComponent p@(Parentable {}) =
+                                  p { parent   = uid }
+                                updateComponent t@(Transformable {}) = 
+                                  t { tslvrs = updateParentable True <$> (tslvrs . transformable $ cam) }
+                                updateComponent cmp = cmp
+
+                                updateParentable :: Bool -> Component -> Component
+                                updateParentable b0 cmp0 = case cmp0 of
+                                  Parentable{} -> cmp0{ parented = b0 }
+                                  _ -> cmp0
 
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
 
                                 Parentable uid p = if not . null $ parentables then head parentables else Parentable nil p
-                                parentables = ([ x | x@(Parentable {} ) <- tslvrs (transform cam) ])                  
+                                parentables = [ x | x@(Parentable {} ) <- tslvrs . transformable $ cam ]                  
 
                     ctrlUnParent :: StateT Game IO ()
                     ctrlUnParent = TMSF.gets $ const () --modify $ camUnParent'
@@ -485,55 +520,3 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   incUnis unis0 = 
                     unis0 { u_time = tick g0 }
 
-stepOnce :: State Game ()
-stepOnce = modify gameObjects
-  where
-    gameObjects :: Game -> Game
-    gameObjects g0 = g0 { objs = updateObject <$> objs g0 }
-      where
-        updateObject :: Object -> Object
-        updateObject obj0 =
-          obj0 { transform = solveTransformable (transform obj0) }
-          where
-            solveTransformable :: Transformable -> Transformable
-            solveTransformable t0 =
-              t0 { xform  = foldr1 (!*!) $ xformSolver (xform t0) <$> tslvrs t0
-                 , tslvrs = updateSolver <$> tslvrs t0 }
-              where
-                updateSolver :: Solvable -> Solvable
-                updateSolver slv =
-                  case slv of
-                    Identity             -> slv
-                    Movable _ pos _ ss   ->
-                      slv { txyz   = pos }
-                    Turnable _ _ _ rxyz _ ss ->
-                      slv { rxyz   = rxyz }
-                    _ -> slv                                                        
-             
-                xformSolver :: M44 Double -> Solvable -> M44 Double
-                xformSolver mtx0 slv =
-                  case slv of
-                    Identity -> identity
-                    Movable cs pos _ _ ->
-                      case cs of
-                        WorldSpace  -> identity & translation .~ pos
-                        ObjectSpace -> undefined
-                    Turnable _ _ rord rxyz _ _ -> transform' identity
-                      where
-                        transform' :: M44 Double -> M44 Double
-                        transform' mtx0' = mtx
-                          where
-                            mtx =
-                              mkTransformationMat
-                              rot
-                              tr
-                              where
-                                rot    = 
-                                  identity !*!
-                                  case rord of
-                                    XYZ ->
-                                          fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (rxyz^._x)) -- pitch
-                                      !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (rxyz^._y)) -- yaw
-                                      !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
-                                tr     = (identity::M44 Double)^.translation
-                    _ -> identity

@@ -24,16 +24,15 @@ import Graphics.RedViz.Game
 import Graphics.RedViz.Material as R
 import Graphics.RedViz.Project
 import Graphics.RedViz.Rendering 
-import Graphics.RedViz.Solvable as S
+import Graphics.RedViz.Component
 import Graphics.RedViz.Texture as T
-import Graphics.RedViz.Transformable
 import Graphics.RedViz.Widget
 import Graphics.RedViz.Uniforms
 
 import Graphics.RedViz.Entity as E
 
 import GameLoop
---import Debug.Trace as DT
+import Debug.Trace as DT
 
 initProject :: Int -> Int -> Project
 initProject resx' resy' =
@@ -56,53 +55,44 @@ initProject resx' resy' =
       "models/fnt_crosshair.gltf"
     , "models/brackets.gltf"
     ]
-  , preObjects = 
-    [ PreObject
-      {
-        pname          = "spaceship"
-      , ptype          = Default
-      , puuid          = nil
-      , modelIDXs      = [2]
-      , tsolvers       =
-        [ Identity
-        , Controllable
+  , pobjects = 
+    [ Schema
+      { slable = "spaceship"
+      , suuid  = nil
+      , scmps  = 
+        [ Renderable
+          { modelIDXs = [2]
+          , drws      = []
+          , active    = False
+          , backend   = defaultBackendOptions
+          }
+        , Selectable { selected = False }
+        , Identity
+        , defaultControllable
           { cvel   = (V3 0 0 0) -- velocity
           , cypr   = (V3 0 0 0) -- rotation
           , cyprS  = (V3 0 0 0) -- sum of rotations
           }
-        -- , Movable
-        --   { space  = WorldSpace
-        --   , txyz   = V3 4 0 0
-        --   , tvel   = V3 0 0.014 0
-        --   , kinslv = [] }
-        -- , Turnable
-        --   { space  = WorldSpace
-        --   , cxyz   = V3 0 0 0
-        --   , rord   = XYZ
-        --   , rxyz   = V3 0 (pi/2) 0
-        --   , avel   = V3 0 0 0
-        --   , kinslv = [] }
-        -- , Attractable
-        --   { mass = 1000.0
-        --   , acc  = V3 0 0 0 }
+        , Attractable
+          { mass = 1000.0
+          , acc  = V3 0 0 0 }
         ]
-      , posolvers      =
-        [ Identity
-        , Selectable
-        ]
-        , options   = defaultBackendOptions
-        , pparent   = nil
-        , pchildren = []
-        , pactive   = True
+      , schildren = []
+      , sparent   = nil
       }
-    , PreObject
+    , Schema
       {
-        pname          = "planet"
-      , ptype          = Default
-      , puuid          = nil
-      , modelIDXs      = [3]
-      , tsolvers       =
-        [ Identity
+        slable = "planet"
+      , suuid  = nil
+      , scmps  =
+        [ Renderable
+          { modelIDXs = [3]
+          , drws      = []
+          , active    = False
+          , backend   = defaultBackendOptions
+          }
+        , Selectable { selected = False }
+        , Identity
         , Movable
           { space  = WorldSpace
           , txyz   = V3 0 0 0
@@ -110,104 +100,89 @@ initProject resx' resy' =
           , kinslv = [] }
         , Attractable
           { mass = 1000000.0
-          , acc  = V3 0 0 0 }
+          , acc  = V3 0 0 0 }      
         ]
-      , posolvers      =
-        [ Identity
-        , Selectable
-        ]
-        , options   = defaultBackendOptions
-        , pparent   = nil
-        , pchildren = []
-        , pactive   = False
+      , schildren = []
+      , sparent   = nil
       }
-    , PreObject
-      {
-        pname          = "stars"
-      , ptype          = Default
-      , puuid          = nil
-      , modelIDXs      = [4]
-      , tsolvers       =
-        [ Identity ]
-      , posolvers      =
-        [ Identity ]
-        , options   = pointsOpts
-        , pparent   = nil
-        , pchildren = []
-        , pactive   = False
+    , Schema
+      { slable = "stars" 
+      , suuid  = nil
+      , scmps  =
+        [ Renderable
+          { modelIDXs = [4]
+          , drws      = []
+          , active    = False
+          , backend   = pointsOpts
+          }
+        ]
+      , schildren = []        
+      , sparent   = nil
       }
     ]
-  , preFontObject =
-    [ PreObject
-      {
-        pname      = "fonts"
-      , ptype      = Font
-      , puuid      = nil
-      , modelIDXs  = [0..75]
-      , tsolvers   = []
-      , posolvers  = [ Identity ]
-      , options    = defaultBackendOptions
-      , pparent    = nil
-      , pchildren  = []
-      , pactive    = False
+  , pfonts =
+    [ Schema
+      { slable = "fonts"
+      , suuid  = nil
+      , scmps =
+        [ Renderable
+          { modelIDXs = [0..75]
+          , drws     = []
+          , active   = False
+          , backend  = defaultBackendOptions
+          }
+        ]
+      , schildren = []
+      , sparent   = nil
       }
     ]
-  , preIconObject =
-    [ PreObject
-      {
-        pname      = "crosshair"
-      , ptype      = Icon
-      , puuid      = nil
-      , modelIDXs  = [0]
-      , tsolvers   = []      
-      , posolvers   = [ Identity ]
-      , options    = defaultBackendOptions
-      , pparent    = nil
-      , pchildren  = []
-      , pactive    = False
+  , picons =
+    [ Schema
+      { slable = "crosshair"
+      , suuid  = nil
+      , scmps =
+        [ Renderable
+          { modelIDXs = [0]
+          , drws     = []
+          , active   = False
+          , backend  = defaultBackendOptions
+          }
+        ]
+      , schildren = []
+      , sparent   = nil
       }
-    , PreObject
-      {
-        pname      = "brackets"
-      , ptype      = Icon
-      , puuid      = nil
-      , modelIDXs  = [1]
-      , tsolvers   = []      
-      , posolvers   = [ Identity ]
-      , options    = linesOpts
-      , pparent    = nil
-      , pchildren  = []
-      , pactive    = False
+    , Schema
+      { slable = "brackets"
+      , suuid  = nil
+      , scmps =
+        [ Renderable
+          { modelIDXs = [1]
+          , drws     = []
+          , active   = False
+          , backend  = linesOpts
+          }
+        ]
+      , schildren = []
+      , sparent   = nil
       }
     ]
   , pcameras    = [ playCam ]
   }
 
-playCam :: Entity  -- TODO: somehow a degault cam is read instead!
+playCam :: Schema
 playCam = 
-  defaultEntity
-  { lable      = "PlayerCamera"
-  , apt        = 50.0
-  , foc        = 100.0
-  , transform  =
-    defaultCamTransformable
-    { tslvrs   =
-      [ S.Constant --Identity
-      -- , Controllable
-      --   { cvel   = (V3 0 0 0) -- velocity
-      --   , cypr   = (V3 0 0 0) -- rotation
-      --   , cyprS  = (V3 0 0 0) -- sum of rotations
-      --   }
-      -- , Parentable { parent = nil }
-      ]
-      -- [ S.Constant ]
-    }
-  , mouseS     = -0.0025
-  , keyboardRS = 0.05
-  , keyboardTS = 0.05
-  , slvrs      = []
-  , E.uuid     = nil
-  , E.parent   = nil
+  Schema
+  { slable = "PlayerCamera"
+  , suuid  = nil
+  , scmps  =
+    [ Camerable
+      { apt        = 50.0
+      , foc        = 100.0 }
+    , defaultCamTransformable
+    , defaultControllable
+    ]
+  , schildren = []
+  , sparent   = nil
   }
 
 type DTime = Double
@@ -272,16 +247,21 @@ main = do
   ftxTuples <- mapM (bindTexture ftxord) ftxs :: IO [(Texture, TextureObject)]
   itxTuples <- mapM (bindTexture itxord) itxs :: IO [(Texture, TextureObject)]
 
-  objs'  <- mapM (toObject txTuples  dms)  (concatMap flatten $ preObjects prj)
-  fobjs' <- mapM (toObject ftxTuples fdms) (preFontObject prj)
-  iobjs' <- mapM (toObject itxTuples idms) (preIconObject prj)
+  objs'  <- mapM (fromSchema txTuples  dms ) (concatMap flatten $ pobjects prj)
+  fobjs' <- mapM (fromSchema ftxTuples fdms) (pfonts   prj)
+  iobjs' <- mapM (fromSchema itxTuples idms) (picons   prj)
+  cams'  <- mapM (fromSchema [] []         ) (pcameras prj)
+
+  --print $ pcameras prj
+  print $ cams'
 
   let
-    (_, initGame') = runState stepOnce $
+    --(_, initGame') = runState stepOnce $
+    initGame' =
       initGame
       { 
         objs = objs'
-      , cams = pcameras prj
+      , cams = cams' --pcameras prj
       , unis =
           defaultUniforms
           { u_res = (resX', resY') }
