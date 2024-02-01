@@ -24,7 +24,7 @@ import Graphics.RedViz.Game
 import Graphics.RedViz.Material as R
 import Graphics.RedViz.Project
 import Graphics.RedViz.Rendering 
-import Graphics.RedViz.Component
+import Graphics.RedViz.Component as C
 import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Widget
 import Graphics.RedViz.Uniforms
@@ -67,15 +67,31 @@ initProject resx' resy' =
           , backend   = defaultBackendOptions
           }
         , Selectable { selected = False }
-        , Identity
-        , defaultControllable
-          { cvel   = (V3 0 0 0) -- velocity
-          , cypr   = (V3 0 0 0) -- rotation
-          , cyprS  = (V3 0 0 0) -- sum of rotations
-          }
+        -- , Identity
+        -- , defaultControllable
+        --   { cvel   = (V3 0 0 0) -- velocity
+        --   , cypr   = (V3 0 0 0) -- rotation
+        --   , cyprS  = (V3 0 0 0) -- sum of rotations
+        --   }
         , Attractable
           { mass = 1000.0
           , acc  = V3 0 0 0 }
+        , Transformable
+          { xform =  
+            (V4
+             (V4 1 0 0 0)   -- <- . . . x ...
+             (V4 0 1 0 0)   -- <- . . . y ...
+             (V4 0 0 1 0)   -- <- . . . z-component of transform
+             (V4 0 0 0 1))
+          , tslvrs =
+            [ Identity
+            , Movable
+              { space  = WorldSpace
+              , txyz   = V3 4 0 0
+              , tvel   = V3 0 0.014 0
+              , kinslv = [] }
+            ]
+          }
         ]
       , schildren = []
       , sparent   = nil
@@ -178,11 +194,15 @@ playCam =
     [ Camerable
       { apt        = 50.0
       , foc        = 100.0 }
+    , Movable
+      { space  = WorldSpace
+      , txyz   = V3 0 0 20
+      , tvel   = V3 0 0 0
+      , kinslv = [] }
     , defaultCamTransformable
       { tslvrs =
         [ Identity
-        , defaultControllable
-        ]
+        , defaultControllable ]
       }
     ]
   , schildren = []
@@ -256,16 +276,12 @@ main = do
   iobjs' <- mapM (fromSchema itxTuples idms) (picons   prj)
   cams'  <- mapM (fromSchema [] []         ) (pcameras prj)
 
-  --print $ pcameras prj
-  print $ cams'
-
   let
-    --(_, initGame') = runState stepOnce $
     initGame' =
       initGame
       { 
         objs = objs'
-      , cams = cams' --pcameras prj
+      , cams = cams'
       , unis =
           defaultUniforms
           { u_res = (resX', resY') }
