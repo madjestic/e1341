@@ -72,11 +72,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                         Transformable{}   -> solveTransformable e0 cmp
                         s@Selectable{}      -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ e0)^.translation) 0.1}
                         _ -> cmp
-                    -- e0 { transform = solveTransformable e0 (transformable e0)
-                    --      , selected  = lookedAt (head $ cams g0) (xform (transform obj0)^.translation) 0.1 }
-                  -- updateCamera :: Camera -> Camera
-                  -- updateCamera cam0 =
-                  --   cam0 { transform = solveTransformable cam0 (transform cam0) }
 
                   (<>) :: Component -> Component -> Component
                   (<>) cmp0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }

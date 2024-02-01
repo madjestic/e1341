@@ -179,7 +179,11 @@ playCam =
       { apt        = 50.0
       , foc        = 100.0 }
     , defaultCamTransformable
-    , defaultControllable
+      { tslvrs =
+        [ Identity
+        , defaultControllable
+        ]
+      }
     ]
   , schildren = []
   , sparent   = nil
