@@ -90,6 +90,17 @@ initProject resx' resy' =
               , txyz   = V3 4 0 0
               , tvel   = V3 0 0.014 0
               , kinslv = [] }
+            , Turnable
+              { space  = WorldSpace
+              , cxyz   = V3 0 0 0
+              , rord   = XYZ
+              , rxyz   = V3 0 (pi/2) 0
+              , avel   = V3 0 0 0
+              , kinslv = [] }
+            , Parentable
+              { parent   = nil
+              , parented = False
+              , active   = True}
             ]
           }
         ]
@@ -202,7 +213,16 @@ playCam =
     , defaultCamTransformable
       { tslvrs =
         [ Identity
-        , defaultControllable ]
+        , defaultControllable
+          { cvel   = (V3 0 0 0) -- velocity
+          , cypr   = (V3 0 0 0) -- rotation
+          , cyprS  = (V3 0 0 0) -- sum of rotations
+          }
+        , Parentable
+          { parent   = nil
+          , parented = False
+          , active   = False}
+        ]
       }
     ]
   , schildren = []

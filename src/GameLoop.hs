@@ -60,7 +60,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
               gameEntities :: Game -> Game
-              gameEntities g0 =
+              gameEntities g0 = -- DT.trace ("cams g0 : " ++ show (cams g0)) $
                 g0 { objs = updateEntity <$> objs g0
                    , cams = updateEntity <$> cams g0 }
                 where
@@ -178,10 +178,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         _  -> (f / m0) *^ (dir ^/ dist)
                                     -- | F = G*@mass*m2/(dist^2);       // Newton's attract equation
                                     -- | a += (F/@mass)*normalize(dir); // Acceleration
-                          Parentable {} -> -- DT.trace ("Parentable :" ++ show cmp) $
+                          Parentable {} -> -- DT.trace ("Parentable :" ++ show (lable obj0) ++ " " ++ show cmp) $ 
                             cmp { parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
                             where
-                              activeObjs = filter (C.active . renderable) $ objs g0
+                              activeObjs = filter (C.active . parentable) $ objs g0
 
                           _ -> cmp                  
  
@@ -367,6 +367,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateComponent :: Component -> Component
                                 updateComponent t0@(Transformable {}) =
+                                  --t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
                                   t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
                                 updateComponent cmp = cmp
                                     
@@ -400,50 +401,33 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   t0 { tslvrs = updateController cam (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs t0}
                                 updateComponent cmp = cmp
 
-                    ctrlParent :: Bool -> StateT Game IO ()
                     ctrlParent False = modify $ camParent'
                       where
                         camParent' :: Game -> Game
-                        camParent' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
+                        camParent' g0 = DT.trace ("ctrlParent :: False, cams: " ++ show (cams g0)) $
+                          g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
                           where
                             updateCamera :: Camera -> Camera
-                            updateCamera cam  = -- DT.trace ("transform cam : " ++ show (transform cam)) $
-                              cam { cmps = updateComponent <$> cmps cam } --E.parent  = uid
-                                  -- , transform =
-                                  --   if (not . null $ parents) && (not . parented . head $ parentables)
-                                  --     then (transform cam) *!* (transform $ head parents)
-                                  --     else transform cam }
+                            updateCamera cam =
+                              cam { cmps = updateComponent <$> cmps cam }
                               where
                                 updateComponent :: Component -> Component
                                 updateComponent p@(Parentable {}) =
-                                  p { parent   = uid
-                                    , parented = not . parented . head $ parentables }
-                                updateComponent t@(Transformable {}) =
-                                    if (not . null $ parents) && (not . parented . head $ parentables)
-                                      then (transformable cam) *!* (transformable . head $ parents)
-                                      else transformable cam 
+                                  p { parent   = uid 
+                                    , parented = not . parented . parentable $ cam }
+                                updateComponent t@(Transformable {}) = 
+                                  -- t { tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
+                                  if (not . null $ parents) && (not . parented . parentable $ cam)
+                                  then t *!* (transformable . head $ parents)
+                                  else t { tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
                                 updateComponent cmp = cmp
 
                                 parents :: [Object]
                                 parents = filter (\o -> uuid o == uid) (objs g0)
 
-                                parentables :: [Component] -- TODO: move parentables to Component?
-                                parentables = [ x | x@(Parentable {} ) <- tslvrs (transformable cam) ]
-
                                 (*!*) :: Component -> Component -> Component
                                 (*!*) t0 t1 = t0 { xform  = rotY (xform t1)
-                                                 , tslvrs = updateParentables (head . parentables' $ t1) (tslvrs t0) } -- !*! (inv44 . xform $ t1)}
-                                  where
-                                    parentables' :: Component -> [Component] -- TODO: move parentables to Component?
-                                    parentables' t0 = [ x | x@(Parentable {} ) <- tslvrs t0 ]
-
-                                    updateParentables :: Component -> [Component] -> [Component]
-                                    updateParentables cmp0 slvs = updateParentable cmp0 <$> slvs
-                                      where
-                                        updateParentable :: Component -> Component -> Component
-                                        updateParentable cmp0 slv1 = case slv1 of
-                                          Parentable{} -> slv1 { parented = parented cmp0 }
-                                          _ -> slv1
+                                                 , tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
 
                                 rotY :: M44 Double -> M44 Double
                                 rotY mtx0 = mtx !*! mtx0
@@ -459,40 +443,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                           !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
                                         tr  = mtx0'^.translation
                                         mtx0' = identity :: M44 Double
-
-                                Parentable uid p = if not . null $ parentables then head parentables else Parentable nil p
-                                  where parentables = ([ x | x@(Parentable {} ) <- tslvrs (transformable cam) ])                                  
-
-                    ctrlParent True = modify $ camParent'
-                      where
-                        camParent' :: Game -> Game
-                        camParent' g0 = g0 { cams = (updateCamera $ head (cams g0)) : (tail (cams g0)) }
-                          where
-                            updateCamera :: Camera -> Camera
-                            updateCamera cam = -- DT.trace ("transform cam : " ++ show (transform cam)) $
-                              -- cam { E.parent = uid
-                              --     , parented = True }
-                              -- cam { E.parent  = uid
-                              --     , transform = (transform cam ){ tslvrs = updateParentable True <$> (tslvrs . transform $ cam)} }
-                              cam { cmps = updateComponent <$> cmps cam }
-                              where
-                                updateComponent :: Component -> Component
-                                updateComponent p@(Parentable {}) =
-                                  p { parent   = uid }
-                                updateComponent t@(Transformable {}) = 
-                                  t { tslvrs = updateParentable True <$> (tslvrs . transformable $ cam) }
-                                updateComponent cmp = cmp
-
-                                updateParentable :: Bool -> Component -> Component
-                                updateParentable b0 cmp0 = case cmp0 of
-                                  Parentable{} -> cmp0{ parented = b0 }
-                                  _ -> cmp0
-
-                                parents :: [Object]
-                                parents = filter (\o -> uuid o == uid) (objs g0)
-
-                                Parentable uid p = if not . null $ parentables then head parentables else Parentable nil p
-                                parentables = [ x | x@(Parentable {} ) <- tslvrs . transformable $ cam ]                  
+    
+                                Parentable uid p a = if not . null $ parentables cam then head (parentables cam) else Parentable nil p a
 
                     ctrlUnParent :: StateT Game IO ()
                     ctrlUnParent = TMSF.gets $ const () --modify $ camUnParent'
