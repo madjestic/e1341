@@ -367,7 +367,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateComponent :: Component -> Component
                                 updateComponent t0@(Transformable {}) =
-                                  --t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
                                   t0 { tslvrs = updateController cam (V3 (fromIntegral n) 0 0) (V3 0 0 0) <$> tslvrs t0}
                                 updateComponent cmp = cmp
                                     
@@ -411,24 +410,20 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             updateCamera cam =
                               cam { cmps = updateComponent <$> cmps cam }
                               where
+                                parents :: [Object]
+                                parents = filter (\o -> uuid o == uid) (objs g0)
+
                                 updateComponent :: Component -> Component
                                 updateComponent p@(Parentable {}) =
                                   p { parent   = uid 
                                     , parented = not . parented . parentable $ cam }
                                 updateComponent t@(Transformable {}) = 
-                                  -- t { tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
-                                  if (not . null $ parents) && (not . parented . parentable $ cam)
-                                  then t *!* (transformable . head $ parents)
-                                  else t { tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
+                                  t { xform = if (not . null $ parents) && (not . parented . parentable $ cam)
+                                              then rotY (xform . transformable $ head parents)
+                                              else xform t
+                                    , tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
                                 updateComponent cmp = cmp
-
-                                parents :: [Object]
-                                parents = filter (\o -> uuid o == uid) (objs g0)
-
-                                (*!*) :: Component -> Component -> Component
-                                (*!*) t0 t1 = t0 { xform  = rotY (xform t1)
-                                                 , tslvrs = updateComponent <$> (tslvrs . transformable $ cam) }
-
+  
                                 rotY :: M44 Double -> M44 Double
                                 rotY mtx0 = mtx !*! mtx0
                                   where                                    
