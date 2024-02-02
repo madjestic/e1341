@@ -461,4 +461,3 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   incUnis :: Uniforms -> Uniforms
                   incUnis unis0 = 
                     unis0 { u_time = tick g0 }
-
