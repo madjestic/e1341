@@ -67,15 +67,6 @@ initProject resx' resy' =
           , backend   = defaultBackendOptions
           }
         , Selectable { selected = False }
-        -- , Identity
-        -- , defaultControllable
-        --   { cvel   = (V3 0 0 0) -- velocity
-        --   , cypr   = (V3 0 0 0) -- rotation
-        --   , cyprS  = (V3 0 0 0) -- sum of rotations
-        --   }
-        , Attractable
-          { mass = 1000.0
-          , acc  = V3 0 0 0 }
         , Transformable
           { xform =  
             (V4
@@ -97,6 +88,9 @@ initProject resx' resy' =
               , rxyz   = V3 0 (pi/2) 0
               , avel   = V3 0 0 0
               , kinslv = [] }
+            , Attractable
+              { mass = 1000.0
+              , acc  = V3 0 0 0 }
             , Parentable
               { parent   = nil
               , parented = False
@@ -119,15 +113,25 @@ initProject resx' resy' =
           , backend   = defaultBackendOptions
           }
         , Selectable { selected = False }
-        , Identity
-        , Movable
-          { space  = WorldSpace
-          , txyz   = V3 0 0 0
-          , tvel   = V3 0 0 0
-          , kinslv = [] }
-        , Attractable
-          { mass = 1000000.0
-          , acc  = V3 0 0 0 }      
+        , Transformable
+          { xform =  
+            (V4
+             (V4 1 0 0 0)   -- <- . . . x ...
+             (V4 0 1 0 0)   -- <- . . . y ...
+             (V4 0 0 1 0)   -- <- . . . z-component of transform
+             (V4 0 0 0 1))
+          , tslvrs =
+            [ Identity
+            , Movable
+              { space  = WorldSpace
+              , txyz   = V3 0 0 0
+              , tvel   = V3 0 0 0
+              , kinslv = [] }
+            , Attractable
+              { mass = 1000000.0
+              , acc  = V3 0 0 0 }
+            ]
+          }
         ]
       , schildren = []
       , sparent   = nil
