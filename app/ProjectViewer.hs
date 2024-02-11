@@ -67,34 +67,41 @@ initProject resx' resy' =
           , backend   = defaultBackendOptions
           }
         , Selectable { selected = False }
+        , Movable
+          { space  = WorldSpace
+          , txyz   = V3 10 0 0
+          , tvel   = V3 0 0.0 0
+          , kinslv = [] }
         , Transformable
           { xform =  
             (V4
-             (V4 1 0 0 0)   -- <- . . . x ...
+             (V4 1 0 0 3)   -- <- . . . x ...
              (V4 0 1 0 0)   -- <- . . . y ...
              (V4 0 0 1 0)   -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
-            , Movable
-              { space  = WorldSpace
-              , txyz   = V3 4 0 0
-              , tvel   = V3 0 0.014 0
-              , kinslv = [] }
-            , Turnable
-              { space  = WorldSpace
-              , cxyz   = V3 0 0 0
-              , rord   = XYZ
-              , rxyz   = V3 0 (pi/2) 0
-              , avel   = V3 0 0 0
-              , kinslv = [] }
-            , Attractable
-              { mass = 1000.0
-              , acc  = V3 0 0 0 }
+            -- , Movable
+            --   { space  = WorldSpace
+            --   , txyz   = V3 3 0 0
+            --   , tvel   = V3 0 0.0 0
+            --   , kinslv = [] }
+            --, C.Constant
+            -- , Turnable
+            --   { space  = WorldSpace
+            --   , cxyz   = V3 0 0 0
+            --   , rord   = XYZ
+            --   , rxyz   = V3 0 (pi/2) 0
+            --   , avel   = V3 0 0 0
+            --   , kinslv = [] }
+            -- , Attractable
+            --   { mass = 1000.0
+            --   , acc  = V3 0 0 0 }
             , Parentable
               { parent   = nil
               , parented = False
               , active   = True}
+            , defaultControllable
             ]
           }
         ]
@@ -209,23 +216,23 @@ playCam =
     [ Camerable
       { apt        = 50.0
       , foc        = 100.0 }
-    , Movable
-      { space  = WorldSpace
-      , txyz   = V3 0 0 20
-      , tvel   = V3 0 0 0
-      , kinslv = [] }
     , defaultCamTransformable
       { tslvrs =
-        [ Identity
-        , defaultControllable
-          { cvel   = (V3 0 0 0) -- velocity
-          , cypr   = (V3 0 0 0) -- rotation
-          , cyprS  = (V3 0 0 0) -- sum of rotations
-          }
+        [ C.Constant --Identity
+        -- , Movable
+        --   { space  = WorldSpace
+        --   , txyz   = V3 0 0 30
+        --   , tvel   = V3 0 0 0
+        --   , kinslv = [] }
         , Parentable
           { parent   = nil
           , parented = False
-          , active   = False}
+          , active   = False }
+        -- , defaultControllable
+        --   { cvel   = (V3 0 0 0) -- velocity
+        --   , cypr   = (V3 0 0 0) -- rotation
+        --   , cyprS  = (V3 0 0 0) -- sum of rotations
+        --   }
         ]
       }
     ]
