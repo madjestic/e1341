@@ -67,11 +67,6 @@ initProject resx' resy' =
           , backend   = defaultBackendOptions
           }
         , Selectable { selected = False }
-        , Movable
-          { space  = WorldSpace
-          , txyz   = V3 10 0 0
-          , tvel   = V3 0 0.0 0
-          , kinslv = [] }
         , Transformable
           { xform =  
             (V4
@@ -81,6 +76,13 @@ initProject resx' resy' =
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
+            -- , PreTransformable
+            --   { tord = RT
+            --   , txyz = V3 0 0 0
+            --   , rord = XYZ
+            --   , rxyz = V3 0 (pi/2) 0
+            --   }
+              --, C.Constant
             -- , Movable
             --   { space  = WorldSpace
             --   , txyz   = V3 3 0 0
@@ -97,11 +99,11 @@ initProject resx' resy' =
             -- , Attractable
             --   { mass = 1000.0
             --   , acc  = V3 0 0 0 }
-            , Parentable
-              { parent   = nil
-              , parented = False
-              , active   = True}
-            , defaultControllable
+            -- , Parentable
+            --   { parent   = nil
+            --   , parented = False
+            --   , active   = True}
+            --, defaultControllable
             ]
           }
         ]
@@ -129,14 +131,14 @@ initProject resx' resy' =
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
-            , Movable
-              { space  = WorldSpace
-              , txyz   = V3 0 0 0
-              , tvel   = V3 0 0 0
-              , kinslv = [] }
-            , Attractable
-              { mass = 1000000.0
-              , acc  = V3 0 0 0 }
+            -- , Movable
+            --   { space  = WorldSpace
+            --   , txyz   = V3 0 0 0
+            --   , tvel   = V3 0 0 0
+            --   , kinslv = [] }
+            -- , Attractable
+            --   { mass = 1000000.0
+            --   , acc  = V3 0 0 0 }
             ]
           }
         ]
@@ -218,21 +220,27 @@ playCam =
       , foc        = 100.0 }
     , defaultCamTransformable
       { tslvrs =
-        [ C.Constant --Identity
+        [ Identity
+          --PreTransformable
+        --, C.Constant -- > passes xform 
         -- , Movable
         --   { space  = WorldSpace
         --   , txyz   = V3 0 0 30
         --   , tvel   = V3 0 0 0
         --   , kinslv = [] }
-        , Parentable
-          { parent   = nil
-          , parented = False
-          , active   = False }
-        -- , defaultControllable
-        --   { cvel   = (V3 0 0 0) -- velocity
-        --   , cypr   = (V3 0 0 0) -- rotation
-        --   , cyprS  = (V3 0 0 0) -- sum of rotations
-        --   }
+        -- , Parentable
+        --   { parent   = nil
+        --   , parented = False
+        --   , active   = False }
+        , Controllable
+          { cvel   = V3 0 0 0     
+          , cypr   = V3 0 0 0
+          , cyprS  = V3 0 0 0
+          , mouseS = -0.0025 -- mouse sensitivity
+          , rotS   =  0.0005 -- rotation sensitivity
+          , movS   =  0.1    -- translation sensitivity
+          , parent = nil
+          }
         ]
       }
     ]
