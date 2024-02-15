@@ -440,7 +440,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       where
                                         rot = (identity :: M33 Double) !*! 
                                               fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (pi)) -- yaw
+                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (pi/2)) -- yaw
                                           !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
                                         tr  = mtx0'^.translation
                                         mtx0' = identity :: M44 Double

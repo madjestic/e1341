@@ -84,19 +84,19 @@ initProject resx' resy' =
             -- , Attractable
             --   { mass = 1000.0
             --   , acc  = V3 0 0 0 }
-            -- , Parentable
-            --   { parent   = nil
-            --   , parented = False
-            --   , active   = True}
-            , Controllable
-              { cvel   = V3 0 0 0     
-              , cypr   = V3 0 0 0
-              , cyprS  = V3 0 0 0
-              , mouseS = -0.0000025 -- mouse sensitivity
-              , rotS   =  0.0005    -- rotation sensitivity
-              , movS   =  0.1       -- translation sensitivity
-              , parent = nil
-              }
+            , Parentable
+              { parent   = nil
+              , parented = False
+              , active   = True}
+            -- , Controllable
+            --   { cvel   = V3 0 0 0     
+            --   , cypr   = V3 0 0 0
+            --   , cyprS  = V3 0 0 0
+            --   , mouseS = -0.0000025 -- mouse sensitivity
+            --   , rotS   =  0.0005    -- rotation sensitivity
+            --   , movS   =  0.1       -- translation sensitivity
+            --   , parent = nil
+            --   }
             ]
           }
         ]
@@ -209,19 +209,19 @@ playCam =
     , defaultCamTransformable
       { tslvrs =
         [ Identity
-        -- , Parentable
-        --   { parent   = nil
-        --   , parented = False
-        --   , active   = False }
-        -- , Controllable
-        --   { cvel   = V3 0 0 0     
-        --   , cypr   = V3 0 0 0
-        --   , cyprS  = V3 0 0 0
-        --   , mouseS = -0.0000025 -- mouse sensitivity
-        --   , rotS   =  0.0005    -- rotation sensitivity
-        --   , movS   =  0.1       -- translation sensitivity
-        --   , parent = nil
-        --   }
+        , Parentable
+          { parent   = nil
+          , parented = False
+          , active   = False }
+        , Controllable
+          { cvel   = V3 0 0 0     
+          , cypr   = V3 0 0 0
+          , cyprS  = V3 0 0 0
+          , mouseS = -0.0000025 -- mouse sensitivity
+          , rotS   =  0.0005    -- rotation sensitivity
+          , movS   =  0.1       -- translation sensitivity
+          , parent = nil
+          }
         ]
       }
     ]
