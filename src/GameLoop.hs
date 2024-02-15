@@ -80,8 +80,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   (<++>) cmp0 _ = cmp0
 
                   solveTransformable :: Entity -> Component -> Component
-                  solveTransformable t0 tr0@(Transformable {}) = -- DT.trace ("tslvrs tr0 :" ++ show (tslvrs tr0)) $
-                    tr0 { xform  = foldl1 (!*!) $ xformSolver (parentXform $ xform tr0) <$> tslvrs tr0
+                  solveTransformable t0 tr0@(Transformable {}) = --DT.trace ("Entity : " ++ show (lable t0) ++ "xform tr0 :" ++ show (xform tr0)) $
+                    tr0 { xform  = foldl (!*!) (xform tr0) $ xformSolver (parentXform $ xform tr0) <$> tslvrs tr0
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
                       parentXform :: M44 Double -> M44 Double
@@ -120,7 +120,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       tr     = (identity::M44 Double)^.translation
                    
                           c0@(Controllable cvel0 ypr0 yprS0 _ _ _ _) -> --DT.trace ("Camerable : " ++ show (camerables t0) ) $ --DT.trace ("Controllable : " ++ show c0 ) $
-                            mkTransformationMat rot tr
+                            (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                             where
                               rot = 
                                 (mtx0^._m33) !*!
@@ -236,7 +236,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 updateControllables :: Game -> Game
                                 updateControllables g0 = g0 { cams = updateEntity <$> cams g0
                                                             , objs = updateEntity <$> objs g0
-                                                              --objs = updateEntity <$> objs g0
                                                             }
                                   where
                                     updateEntity :: Entity -> Entity
@@ -328,7 +327,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           ctrl@(Controllable _ _ cyprS _ keyboardRS keyboardTS _) -> -- Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS ->
                             ctrl { cvel  = keyboardTS *^ vel0
                                  , cypr  = keyboardRS *^ ypr0
+                                 --, cypr  = V3 0 0 0.000001
                                  , cyprS = keyboardRS *^ ypr0 + cyprS } 
+                                 --, cyprS = V3 0 0 0 } 
                           _ -> cmp0
 
                     ctrlDolly :: Integer -> StateT Game IO ()
@@ -398,7 +399,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                     ctrlParent False = modify $ camParent'
                       where
                         camParent' :: Game -> Game
-                        camParent' g0 = DT.trace ("camParent' objs: " ++ show (objs g0)) $ DT.trace ("camParent' cams: " ++ show (cams g0)) $
+                        camParent' g0 = --DT.trace ("camParent' objs: " ++ show (objs g0)) $ DT.trace ("camParent' cams: " ++ show (cams g0)) $
                           g0 { cams = updateEntity <$> cams g0
                              , objs = updateEntity <$> objs g0
                              }
