@@ -24,6 +24,7 @@ import Graphics.RedViz.Widget as W
 import Data.Aeson (Value(Object))
 
 import Debug.Trace as DT
+import Codec.Picture.Metadata (Value(Double))
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
@@ -100,26 +101,19 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             case cs of
                               WorldSpace  -> identity & translation .~ pos
                               ObjectSpace -> undefined
-                          Turnable _ _ rord rxyz _ _ -> transform' identity
+                          Turnable _ _ rord rxyz _ _ ->  -- TODO: add Object/World rotation distinction
+                            (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                             where
-                              transform' :: M44 Double -> M44 Double
-                              transform' mtx0' = mtx
-                                where
-                                  mtx =
-                                    mkTransformationMat
-                                    rot
-                                    tr
-                                    where
-                                      rot    = 
-                                        identity !*!
-                                        case rord of
-                                          XYZ ->
-                                                fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (rxyz^._x)) -- pitch
-                                            !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (rxyz^._y)) -- yaw
-                                            !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (rxyz^._z)) -- roll
-                                      tr     = (identity::M44 Double)^.translation
+                              rot    = 
+                                identity !*!
+                                case rord of
+                                  XYZ ->
+                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (rxyz^._x)) -- pitch
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (rxyz^._y)) -- yaw
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (rxyz^._z)) -- roll
+                              tr     = (identity::M44 Double)^.translation
                    
-                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ _) -> --DT.trace ("Camerable : " ++ show (camerables t0) ) $ --DT.trace ("Controllable : " ++ show c0 ) $
+                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0) -> --DT.trace ("Camerable : " ++ show (camerables t0) ) $ --DT.trace ("Controllable : " ++ show c0 ) $
                             (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                             where
                               rot = 
@@ -314,7 +308,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   , ((ScancodeV     , Pressed,  False)  , ctrlParent False )
                   , ((ScancodeV     , Pressed,  True)   , ctrlParent True  )
-                  --, ((ScancodeV     , Released, False)  , ctrlUnParent     )
                   ]
                   where
                     updateController :: Entity
@@ -327,9 +320,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           ctrl@(Controllable _ _ cyprS _ keyboardRS keyboardTS _) -> -- Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS ->
                             ctrl { cvel  = keyboardTS *^ vel0
                                  , cypr  = keyboardRS *^ ypr0
-                                 --, cypr  = V3 0 0 0.000001
                                  , cyprS = keyboardRS *^ ypr0 + cyprS } 
-                                 --, cyprS = V3 0 0 0 } 
                           _ -> cmp0
 
                     ctrlDolly :: Integer -> StateT Game IO ()
@@ -447,9 +438,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
     
                                 Parentable uid p a = if not . null $ parentables t0 then head (parentables t0) else Parentable nil p a
 
-                    -- ctrlUnParent :: StateT Game IO ()
-                    -- ctrlUnParent = TMSF.gets $ const ()
-                                               
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b
                       where
