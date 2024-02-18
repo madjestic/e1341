@@ -70,9 +70,9 @@ initProject resx' resy' =
         , Transformable
           { xform =  
             (V4
-             (V4 1 0 0 3.14)   -- <- . . . x ...
-             (V4 0 1 0 0)   -- <- . . . y ...
-             (V4 0 0 1 0)   -- <- . . . z-component of transform
+             (V4 1 0 0 6.14) -- <- . . . x ...
+             (V4 0 1 0 0)    -- <- . . . y ...
+             (V4 0 0 1 0)    -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
@@ -85,18 +85,7 @@ initProject resx' resy' =
             --   { mass = 1000.0
             --   , acc  = V3 0 0 0 }
             , Parentable
-              { parent   = nil
-              , parented = False
-              , active   = True}
-            -- , Controllable
-            --   { cvel   = V3 0 0 0     
-            --   , cypr   = V3 0 0 0
-            --   , cyprS  = V3 0 0 0
-            --   , mouseS = -0.0000025 -- mouse sensitivity
-            --   , rotS   =  0.0005    -- rotation sensitivity
-            --   , movS   =  0.1       -- translation sensitivity
-            --   , parent = nil
-            --   }
+              { parent   = nil }
             ]
           }
         ]
@@ -206,13 +195,15 @@ playCam =
     [ Camerable
       { apt        = 50.0
       , foc        = 100.0 }
-    , defaultCamTransformable
-      { tslvrs =
+    , Transformable
+      { xform =  
+        (V4
+         (V4 1 0 0 0)    -- <- . . . x ...
+         (V4 0 1 0 0)    -- <- . . . y ...
+         (V4 0 0 1 30)   -- <- . . . z-component of transform
+         (V4 0 0 0 1))
+      , tslvrs =
         [ Identity
-        , Parentable
-          { parent   = nil
-          , parented = False
-          , active   = False }
         , Controllable
           { cvel   = V3 0 0 0     
           , cypr   = V3 0 0 0

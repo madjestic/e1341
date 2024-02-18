@@ -1,12 +1,13 @@
 module GameLoop where
 
 import Data.MonadicStreamFunction
+import Data.Maybe (fromMaybe)
 import Control.Monad.Trans.Class
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.MSF as TMSF
-import Data.UUID (nil)
+import Data.UUID (nil, fromText)
 import Foreign.C.Types
 import GHC.Float
 import Lens.Micro
@@ -23,8 +24,10 @@ import Graphics.RedViz.Uniforms
 import Graphics.RedViz.Widget as W
 import Data.Aeson (Value(Object))
 
+import Control.Concurrent
+import Control.Concurrent.MVar
+
 import Debug.Trace as DT
-import Codec.Picture.Metadata (Value(Double))
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
@@ -69,10 +72,17 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   updateEntity e0 = -- DT.trace ("e0 :" ++ show e0) $
                     e0{ cmps = updateComponent <$> cmps e0}
                     where
-                      updateComponent cmp = case cmp of
-                        Transformable{}   -> solveTransformable e0 cmp
-                        s@Selectable{}    -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ e0)^.translation) 0.1}
-                        _ -> cmp
+                      updateComponent cmp =
+                          case cmp of
+                            Transformable{}   -> solveTransformable e0 cmp
+                            s@Selectable{}    -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ e0)^.translation) 0.1}
+                            _ -> cmp
+
+                  parentXform :: Entity -> Component
+                  parentXform = transformable . fromComponent . parentable
+                    where
+                      fromComponent :: Component -> Entity
+                      fromComponent p0 = head $ filter (\obj' -> uuid obj' /= parent p0) $ objs g0
 
                   (<++>) :: Component -> Component -> Component
                   (<++>) cmp0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }
@@ -82,16 +92,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   solveTransformable :: Entity -> Component -> Component
                   solveTransformable t0 tr0@(Transformable {}) = --DT.trace ("Entity : " ++ show (lable t0) ++ "xform tr0 :" ++ show (xform tr0)) $
-                    tr0 { xform  = foldl (!*!) (xform tr0) $ xformSolver (parentXform $ xform tr0) <$> tslvrs tr0
+                    tr0 { xform  = foldl (!*!) (xform tr0) $ xformSolver (xform tr0) <$> tslvrs tr0
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
-                      parentXform :: M44 Double -> M44 Double
-                      parentXform mtx0 = -- TODO: infer parenting xform correction from parent xform
-                        if (not . null $ parentables t0) && (not . null $ parents') && (parented . parentable $ t0)
-                        then (xform . transformable $ t0)&translation .~ (xform . transformable . head $ parents')^.translation
-                        else mtx0
-                        where parents' = parents t0 (objs g0) 
-
                       xformSolver :: M44 Double -> Component -> M44 Double
                       xformSolver mtx0 cmp =
                         case cmp of
@@ -101,32 +104,39 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             case cs of
                               WorldSpace  -> identity & translation .~ pos
                               ObjectSpace -> undefined
-                          Turnable _ _ rord rxyz _ _ ->  -- TODO: add Object/World rotation distinction
-                            (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
-                            where
-                              rot    = 
-                                identity !*!
-                                case rord of
-                                  XYZ ->
-                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (rxyz^._x)) -- pitch
-                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (rxyz^._y)) -- yaw
-                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (rxyz^._z)) -- roll
-                              tr     = (identity::M44 Double)^.translation
-                   
-                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0) -> --DT.trace ("Camerable : " ++ show (camerables t0) ) $ --DT.trace ("Controllable : " ++ show c0 ) $
+                          Turnable _ rord cxyz rxyz avel _ ->  -- TODO: add Object/World rotation distinction
                             (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                             where
                               rot = 
+                                --identity !*! -- TODO: WorldSpace - ObjectSpace
                                 (mtx0^._m33) !*!
-                                    fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
-                                !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
-                                !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
-                              tr  = -- DT.trace ("name : " ++ show (lable t0) ++ " camerables : " ++ show (camerables t0)) $
-                                case camerables t0 of
-                                  [] -> mtx0^.translation + (mtx0^._m33) !* cvel0
-                                  _  -> mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+                                case rord of
+                                  XYZ ->
+                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (avel^._x)) -- pitch
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (avel^._y)) -- yaw
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (avel^._z)) -- roll
+                              tr = cxyz
+                   
+                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) -> --DT.trace ("Camerable : " ++ show (camerables t0) ) $ --DT.trace ("Controllable : " ++ show c0 ) $
+                            case parent0 == nil of
+                              _ ->
+                                (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
+                                where
+                                  rot = 
+                                    (mtx0^._m33) !*!
+                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
+                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
+                                  tr  = -- DT.trace ("name : " ++ show (lable t0) ++ " camerables : " ++ show (camerables t0)) $
+                                    case camerables t0 of
+                                      [] -> mtx0^.translation + (mtx0^._m33) !* cvel0
+                                      _  -> mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+
                           --Attractable mass acc -> identity & translation .~ V3 0 0 0.1 -- acc -- identity -- & translation .~ pos
-                          Parentable {} -> identity
+                          Parentable uuid0 ->
+                            case uuid0 == nil of
+                              True -> identity
+                              _   ->  xformSolver mtx0 (controllable . head . filter (\t0' -> uuid t0' == uuid0 ) . controllabless $ g0)
                           _ -> identity
 
                       updateComponent :: Component -> Component
@@ -169,10 +179,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         _  -> (f / m0) *^ (dir ^/ dist)
                                     -- | F = G*@mass*m2/(dist^2);       // Newton's attract equation
                                     -- | a += (F/@mass)*normalize(dir); // Acceleration
-                          Parentable {} -> -- DT.trace ("Parentable :" ++ show (lable t0) ++ " " ++ show cmp) $ 
-                            cmp { parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
-                            where
-                              activeObjs = filter (C.active . parentable) $ objs g0
+                          -- Parentable {} -> -- DT.trace ("Parentable :" ++ show (lable t0) ++ " " ++ show cmp) $ 
+                          --   cmp { parent = if not . null $ activeObjs then uuid . head $ activeObjs else nil }
+                          --   where
+                          --     activeObjs = filter (C.active . parentable) $ objs g0
 
                           _ -> cmp                  
                   solveTransformable _ tr0 = tr0
@@ -308,6 +318,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   , ((ScancodeV     , Pressed,  False)  , ctrlParent False )
                   , ((ScancodeV     , Pressed,  True)   , ctrlParent True  )
+                  --, ((ScancodeV     , Released, False)  , ctrlParent' False )
                   ]
                   where
                     updateController :: Entity
@@ -317,7 +328,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                      -> Component
                     updateController obj vel0 ypr0 cmp0 = 
                         case cmp0 of
-                          ctrl@(Controllable _ _ cyprS _ keyboardRS keyboardTS _) -> -- Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS ->
+                          ctrl@(Controllable _ _ cyprS _ keyboardRS keyboardTS _) ->
                             ctrl { cvel  = keyboardTS *^ vel0
                                  , cypr  = keyboardRS *^ ypr0
                                  , cyprS = keyboardRS *^ ypr0 + cyprS } 
@@ -368,7 +379,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateComponent :: Component -> Component
                                 updateComponent tr0@(Transformable {}) =
-                                  tr0 { tslvrs = updateController t0 (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs tr0}
+                                  tr0 { tslvrs = updateController t0 (V3 0 (fromIntegral n) 0) (V3 0 0 0) <$> tslvrs tr0 }
                                 updateComponent cmp = cmp
 
                     ctrlRoll :: Integer -> StateT Game IO ()
@@ -387,37 +398,53 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   tr0 { tslvrs = updateController t0 (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs tr0}
                                 updateComponent cmp = cmp
 
-                    ctrlParent False = modify $ camParent'
+                    -- ctrlParent' False = modify debugEntity
+                    --   where
+                    --     debugEntity :: Game -> Game
+                    --     debugEntity g0 = DT.trace (  "################### RELEASED ######################" ++ "\n"
+                    --                                 ++ "cams g0 : " ++ show (cams g0) ++ "\n"
+                    --                                 ++ "objs g0 : " ++ show (objs g0) ++ "\n"
+                    --                                 ++ "#################################################" ++ "\n"
+                    --                               ) g0
+                    
+                    ctrlParent False = do
+                      modify parentEntity
                       where
-                        camParent' :: Game -> Game
-                        camParent' g0 = --DT.trace ("camParent' objs: " ++ show (objs g0)) $ DT.trace ("camParent' cams: " ++ show (cams g0)) $
-                          g0 { cams = updateEntity <$> cams g0
-                             , objs = updateEntity <$> objs g0
+                        parentEntity :: Game -> Game
+                        parentEntity g0 = 
+                          g0 { cams = updateEntity  <$> cams g0
+                             , objs = updateEntity  <$> objs g0
                              }
                           where
                             updateEntity :: Entity -> Entity
-                            updateEntity t0 =
+                            updateEntity t0 = 
                               t0 { cmps = updateComponent <$> cmps t0 }
                               where
-                                parentable2controllable :: Component
-                                parentable2controllable = controllable . fromComponent $ parentable t0
-
-                                controllable2parentable :: Component
-                                controllable2parentable = parentable . fromComponent $ controllable t0
-
-                                fromComponent :: Component -> Entity
-                                fromComponent p0 = head $ filter (\obj' -> uuid obj' /= parent p0) $ objs g0
-
                                 updateComponent :: Component -> Component
-                                updateComponent p@(Parentable {})    = parentable2controllable
-                                updateComponent p@(Controllable {})  = controllable2parentable
-                                updateComponent t@(Transformable {}) = --DT.trace ("entity: " ++ show (lable t0) ++ " parentable: " ++ show (parentable t0)) $
-                                  t { xform = if (not . null $ parents') && (not . parented . parentable $ t0) -- if camera is orphan, but has potential parents
-                                              then rotY (xform . transformable $ head parents')
-                                              else xform t
-                                    , tslvrs = updateComponent <$> (tslvrs . transformable $ t0) --}
-                                    }
-                                  where parents' = parents t0 (objs g0) :: [Entity]
+                                updateComponent c@(Controllable _ _ _ _ _ _ parent0)   =
+                                  if parent0 == nil
+                                  then c { parent = uuid . head . parentabless $ g0 }
+                                  else c { parent = nil }
+
+                                updateComponent p@(Parentable parent0)     =
+                                  if parent0 == nil
+                                  then p { parent = uuid . head . controllabless $ g0 }
+                                  else p { parent = nil }
+
+                                updateComponent tr@(Transformable {}) 
+                                  | isControllable t0 = 
+                                      tr { xform  = rotY (xform . transformable . head $ parentabless g0)
+                                         , tslvrs = updateComponent <$> (tslvrs . transformable $ t0)
+                                         }
+                                  | isParentable t0 = 
+                                      tr { xform  = xform tr
+                                         , tslvrs = updateComponent <$> (tslvrs . transformable $ t0)
+                                         }
+                                  | otherwise = tr
+                                  where
+                                    isControllable t0 = case controllables t0 of [] -> False; _ -> True
+                                    isParentable   t0 = case parentables   t0 of [] -> False; _ -> True
+                                    isCamerable    t0 = case camerables    t0 of [] -> False; _ -> True
                                   
                                 updateComponent cmp = cmp
   
@@ -428,15 +455,24 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       mkTransformationMat
                                       rot
                                       tr
-                                      where
-                                        rot = (identity :: M33 Double) !*! 
-                                              fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (pi/2)) -- yaw
-                                          !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
-                                        tr  = mtx0'^.translation
-                                        mtx0' = identity :: M44 Double
+                                      where -- TODO: rotation must be local to object (Object Space)
+                                        --rot = (mtx0^._m33 :: M33 Double) !*! 
+                                        rot = identity :: M33 Double -- !*! 
+                                          --     fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
+                                          -- !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (0)) -- yaw
+                                          -- !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
+                                        --tr  = mtx0'^.translation
+                                        tr  = V3 0 0 0 
+                                        mtx0' = mtx0 :: M44 Double
+
+                                        -- rot = (identity :: M33 Double) !*! 
+                                        --       fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (0))  -- pitch
+                                        --   !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (pi)) -- yaw
+                                        --   !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (0))  -- roll
+                                        -- tr  = mtx0'^.translation
+                                        -- mtx0' = identity :: M44 Double
     
-                                Parentable uid p a = if not . null $ parentables t0 then head (parentables t0) else Parentable nil p a
+                                -- Parentable uid = if not . null $ parentables t0 then head (parentables t0) else Parentable nil
 
                     quitE :: Bool -> StateT Game IO ()
                     quitE b = modify $ quit' b

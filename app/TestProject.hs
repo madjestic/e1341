@@ -80,10 +80,10 @@ initProject resx' resy' =
               , kinslv  = [] }
             , Turnable
               { space   = ObjectSpace
-              , cxyz    = V3 0 0 0
               , rord    = XYZ
-              , rxyz    = V3 0 0 (0.5)
-              , avel    = V3 0 0 (0.1)
+              , cxyz    = V3 0 0 0
+              , rxyz    = V3 0 0 0
+              , avel    = V3 0 0 (0.05)
               , kinslv =
                 [ Fadable
                   { life = 1.0
@@ -171,9 +171,7 @@ playCam =
           , cyprS  = (V3 0 0 0) -- sum of rotations
           }
         , Parentable
-          { parent   = nil
-          , parented = False
-          , active   = False}
+          { parent   = nil }
         ]
       }
     ]
