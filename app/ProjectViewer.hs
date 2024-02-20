@@ -80,6 +80,7 @@ initProject resx' resy' =
               { txyz = V3 0 0 0
               , rord = XYZ
               , rxyz = V3 0 (pi/2) 0
+              --, rxyz = V3 0 0 0
               }
             -- , Attractable
             --   { mass = 1000.0
