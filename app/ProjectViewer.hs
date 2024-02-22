@@ -70,7 +70,7 @@ initProject resx' resy' =
         , Transformable
           { xform =  
             (V4
-             (V4 1 0 0 6.14) -- <- . . . x ...
+             (V4 1 0 0 3.14) -- <- . . . x ...
              (V4 0 1 0 0)    -- <- . . . y ...
              (V4 0 0 1 0)    -- <- . . . z-component of transform
              (V4 0 0 0 1))
@@ -79,12 +79,17 @@ initProject resx' resy' =
             , PreTransformable
               { txyz = V3 0 0 0
               , rord = XYZ
-              , rxyz = V3 0 (pi/2) 0
-              --, rxyz = V3 0 0 0
+              , rxyz = V3 0 (0) 0 -- TODO pre-rotation composes weirdly down the line
               }
-            -- , Attractable
-            --   { mass = 1000.0
-            --   , acc  = V3 0 0 0 }
+            , Movable
+              { space    = WorldSpace    :: CoordSys
+              , tvel     = V3 0 0.014 0    :: V3 Double -- velocity
+              , kinslv   =
+                [ Attractable
+                  { mass = 1000.0
+                  , acc  = V3 0 0 0 }
+                ] :: [Component]
+              } 
             , Parentable
               { parent   = nil }
             ]
@@ -114,9 +119,9 @@ initProject resx' resy' =
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
-            -- , Attractable
-            --   { mass = 1000000.0
-            --   , acc  = V3 0 0 0 }
+            , Attractable
+              { mass = 1000000000.0
+              , acc  = V3 0 0 0 }
             ]
           }
         ]

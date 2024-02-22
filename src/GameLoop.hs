@@ -78,17 +78,11 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             s@Selectable{}    -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ e0)^.translation) 0.1}
                             _ -> cmp
 
-                  (<++>) :: Component -> Component -> Component
-                  (<++>) cmp0@(Movable _ _ v0 _)       (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }
-                  (<++>) cmp0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = cmp0 { avel = amp * f (l-a) *^ av0 }
-                  (<++>) cmp0@(Movable _ _ v0 _)       (Attractable _ a)     = cmp0 { tvel = v0 + a }  -- a*dt?
-                  (<++>) cmp0 _ = cmp0
-
                   solveTransformable :: Entity -> Component -> Component
                   solveTransformable t0 tr0@(Transformable {}) = --DT.trace ("Entity : " ++ show (lable t0) ++ "xform tr0 :" ++ show (xform tr0)) $
                     tr0 { xform  = case isParented t0 of 
                             False -> foldl (!*!) (xform tr0) $ xformSolver (xform tr0) <$> tslvrs tr0
-                            True  -> foldl (!*!) (identity) $ xformSolver (xform tr0) <$> tslvrs tr0
+                            True  -> foldl (!*!) (identity)  $ xformSolver (xform tr0) <$> tslvrs tr0
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
                       isParented   t0 = (parent . parentable $ t0) /= nil
@@ -98,9 +92,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                         case cmp of
                           Identity -> identity
                           Constant -> mtx0
-                          Movable cs pos _ _ ->
+                          Movable cs vel0 _ ->
                             case cs of
-                              WorldSpace  -> identity & translation .~ pos
+                              WorldSpace  -> identity & translation .~ vel0
                               ObjectSpace -> undefined
                           Turnable _ rord cxyz rxyz avel _ ->  -- TODO: add Object/World rotation distinction
                             (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
@@ -136,7 +130,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       [] -> mtx0^.translation + (mtx0^._m33) !* cvel0
                                       _  -> mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
 
-                          --Attractable mass acc -> identity & translation .~ V3 0 0 0.1 -- acc -- identity -- & translation .~ pos
+                          -- Attractable _ acc -> identity - it's solved
+                            --(identity :: M44 Double) & translation .~ acc -- identity -- & translation .~ pos -- TODO:
+                            --(inv44 mtx0 & translation .~ V3 0 0 0 :: M44 Double) & translation .~ acc -- sort of works
+                            --((inv44 mtx0 & translation .~ V3 0 0 0 :: M44 Double) & translation .~ acc)
+                            where mtx' = mtx0 & translation .~ V3 0 0 0 :: M44 Double
+                            
                           Parentable uuid0 ->
                             case uuid0 == nil of
                               True -> identity :: M44 Double
@@ -169,13 +168,18 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                           _ -> identity
 
+                      (<++>) :: Component -> Component -> Component
+                      (<++>) cmp0@(Movable _ v0 _)       (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }
+                      (<++>) cmp0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = cmp0 { avel = amp * f (l-a) *^ av0 }
+                      (<++>) cmp0@(Movable _ v0 _)       (Attractable _ a)     = cmp0 { tvel = v0 + a }  -- a*dt?
+                      (<++>) cmp0 _ = cmp0
+
                       updateComponent :: Component -> Component
                       updateComponent cmp = -- DT.trace ("cmp :" ++ show cmp) $
                         case cmp of
                           Identity             -> cmp
-                          Movable _ pos vel0 ss   ->
-                            cmp { txyz   = pos  + vel0
-                                , tvel   = tvel (foldl (<++>) cmp (ss ++ (tslvrs.transformable $ t0)))
+                          Movable _ vel0 ss   ->
+                            cmp { tvel   = tvel (foldl (<++>) cmp (ss ++ (tslvrs.transformable $ t0)))
                                 , kinslv = updateComponent <$> ss}
                           Turnable _ _ _ rxyz avel0 ss ->
                             cmp { rxyz   = rxyz + avel0
@@ -183,20 +187,23 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 , kinslv  = updateComponent <$> ss }
                           Fadable l a inc _ _ ->
                             cmp { age    = min (a + inc) l}
-                          Attractable m0 _ -> cmp { acc = gravity }
+                          --Attractable m0 _ -> cmp { acc = DT.trace ("DEBUG : " ++ show gravity) $ gravity }
+                          Attractable m0 _ -> cmp { acc = gravity * 0.001 }
                             where 
                               gravity :: V3 Double
-                              gravity =
+                              gravity = 
                                 if not.null $ attractors then foldr (attract t0) (V3 0 0 0) attractors else V3 0 0 0
                                 where
                                   attractors :: [Object]
-                                  attractors = filter (\obj' -> uuid obj' /= uuid t0) $ objs g0
+                                  attractors = -- DT.trace ("DEBUG : " ++ show (fmap lable $ filter (\obj' -> uuid obj' /= uuid t0) $ objs g0))
+                                    filter (\obj' -> uuid obj' /= uuid t0) $ objs g0
 
                                   attract :: Object -> Object -> V3 Double -> V3 Double
                                   attract obj0' obj1' acc0 = -- DT.trace ("t0 :" ++ show t0) $
                                     acc0 + acc'
                                     where
-                                      attractables = ([ x | x@(Attractable {} ) <- tslvrs (transformable obj1') ])
+                                      attractables = -- DT.trace ("DEBUG : " ++ show (([ x | x@(Attractable {} ) <- tslvrs (transformable obj1') ])))
+                                        ([ x | x@(Attractable {} ) <- tslvrs (transformable obj1') ])
                                       Attractable m1 _  = if not.null $ attractables then head attractables else Attractable 0 (V3 0 0 0)
                                       p0   = (xform.transformable $ obj0')^.translation
                                       p1   = (xform.transformable $ obj1')^.translation
@@ -348,7 +355,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
 
                   , ((ScancodeV     , Pressed,  False)  , ctrlParent False )
                   , ((ScancodeV     , Pressed,  True)   , ctrlParent True  )
-                  , ((ScancodeV     , Released, False)  , ctrlParent' False )
+                  --, ((ScancodeV     , Released, False)  , ctrlParent' False )
                   ]
                   where
                     updateController :: Entity
@@ -413,7 +420,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 updateComponent cmp = cmp
 
                     ctrlRoll :: Integer -> StateT Game IO ()
-                    ctrlRoll n = modify $ camRoll'
+                    ctrlRoll n = modify camRoll'
                       where
                         camRoll' :: Game -> Game
                         camRoll' g0 = g0 { cams = updateEntity <$> cams g0
@@ -425,17 +432,17 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               where
                                 updateComponent :: Component -> Component
                                 updateComponent tr0@(Transformable {}) =
-                                  tr0 { tslvrs = updateController t0 (V3 0 0 0) (V3 0 0 (fromIntegral n)) <$> tslvrs tr0}
+                                  tr0 { tslvrs = updateController t0 (V3 0 0 0) (V3 0 0 (fromIntegral (-n*50))) <$> tslvrs tr0}
                                 updateComponent cmp = cmp
 
-                    ctrlParent' False = modify debugEntity
-                      where
-                        debugEntity :: Game -> Game
-                        debugEntity g0 = DT.trace (  "################### RELEASED ######################" ++ "\n"
-                                                    ++ "cams g0 : " ++ show (cams g0) ++ "\n"
-                                                    ++ "objs g0 : " ++ show (objs g0) ++ "\n"
-                                                    ++ "#################################################" ++ "\n"
-                                                  ) g0
+                    -- ctrlParent' False = modify debugEntity
+                    --   where
+                    --     debugEntity :: Game -> Game
+                    --     debugEntity g0 = DT.trace (  "################### RELEASED ######################" ++ "\n"
+                    --                                 ++ "cams g0 : " ++ show (cams g0) ++ "\n"
+                    --                                 ++ "objs g0 : " ++ show (objs g0) ++ "\n"
+                    --                                 ++ "#################################################" ++ "\n"
+                    --                               ) g0
                     
                     ctrlParent False = do
                       modify parentEntity
