@@ -75,7 +75,6 @@ initProject resx' resy' =
             [ Identity
             , Movable
               { space   = WorldSpace
-              , txyz    = V3 1.5 0 0
               , tvel    = V3 0.0 0 0
               , kinslv  = [] }
             , Turnable
@@ -159,7 +158,7 @@ playCam =
       , foc        = 100.0 }
     , Movable
       { space  = WorldSpace
-      , txyz   = V3 0 0 20
+      --, txyz   = V3 0 0 20
       , tvel   = V3 0 0 0
       , kinslv = [] }
     , defaultCamTransformable

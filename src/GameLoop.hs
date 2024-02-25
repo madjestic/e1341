@@ -81,8 +81,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   solveTransformable :: Entity -> Component -> Component
                   solveTransformable t0 tr0@(Transformable {}) = --DT.trace ("Entity : " ++ show (lable t0) ++ "xform tr0 :" ++ show (xform tr0)) $
                     tr0 { xform  = case isParented t0 of 
-                            False -> foldl (!*!) (xform tr0) $ xformSolver (xform tr0) <$> tslvrs tr0
-                            True  -> foldl (!*!) (identity)  $ xformSolver (xform tr0) <$> tslvrs tr0
+                            False -> foldl (flip (!*!)) (xform tr0) $ xformSolver (xform tr0) <$> tslvrs tr0
+                            True  -> foldl (flip (!*!)) (identity)  $ xformSolver (xform tr0) <$> tslvrs tr0
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
                       isParented   t0 = (parent . parentable $ t0) /= nil
@@ -92,7 +92,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                         case cmp of
                           Identity -> identity
                           Constant -> mtx0
-                          Movable cs vel0 _ ->
+                          Movable cs vel0 _ -> -- DT.trace ("Movable : " ++ show ((identity :: M44 Double) & translation .~ vel0))
                             case cs of
                               WorldSpace  -> identity & translation .~ vel0
                               ObjectSpace -> undefined
@@ -153,7 +153,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                       where
                                         --rot = mtx0^._m33 !*!
                                         rot = (identity :: M44 Double)^._m33 !*!
-                                              fromQuaternion (axisAngle (mtx0^.(_m33._x)) (0)) -- pitch
+                                              fromQuaternion (axisAngle (mtx0^.(_m33._x)) (0))    -- pitch
                                           !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (pi/2)) -- yaw
                                           !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (0)) -- roll
                                         tr = V3 0 0 0
@@ -169,9 +169,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           _ -> identity
 
                       (<++>) :: Component -> Component -> Component
-                      (<++>) cmp0@(Movable _ v0 _)       (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }
+                      (<++>) cmp0@(Movable _ v0 _)         (Fadable l a _ amp f) = cmp0 { tvel = amp * f (l-a) *^ v0 }
                       (<++>) cmp0@(Turnable _ _ _ _ av0 _) (Fadable l a _ amp f) = cmp0 { avel = amp * f (l-a) *^ av0 }
-                      (<++>) cmp0@(Movable _ v0 _)       (Attractable _ a)     = cmp0 { tvel = v0 + a }  -- a*dt?
+                      (<++>) cmp0@(Movable _ v0 _)         (Attractable _ a)     = cmp0 { tvel = v0 + a }  -- a*dt?
                       (<++>) cmp0 _ = cmp0
 
                       updateComponent :: Component -> Component

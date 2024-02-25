@@ -65,7 +65,7 @@ initProject resx' resy' =
           , drws      = []
           , active    = False
           , backend   = defaultBackendOptions
-          }
+          } 
         , Selectable { selected = False }
         , Transformable
           { xform =  
@@ -79,13 +79,14 @@ initProject resx' resy' =
             , PreTransformable
               { txyz = V3 0 0 0
               , rord = XYZ
-              , rxyz = V3 0 (0) 0 -- TODO pre-rotation composes weirdly down the line
+              , rxyz = V3 0 (pi/2) 0 -- TODO pre-rotation composes weirdly down the line
+              --, rxyz = V3 0 (0) 0 -- TODO pre-rotation composes weirdly down the line
               }
             , Movable
-              { space    = WorldSpace    :: CoordSys
+              { space    = WorldSpace  :: CoordSys
               , tvel     = V3 0 0.014 0    :: V3 Double -- velocity
-              , kinslv   =
-                [ Attractable
+              , kinslv   = [
+                  Attractable
                   { mass = 1000.0
                   , acc  = V3 0 0 0 }
                 ] :: [Component]
