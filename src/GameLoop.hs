@@ -167,15 +167,13 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                           xformSolver' mtx0' cmp = 
                                             case cmp of
                                               c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) ->
-                                                --(!*!) (inv44 $ identity) $ mkTransformationMat rot tr
                                                 flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                                                 where
-                                                  mtx0'' = identity :: M44 Double
                                                   rot = 
                                                     (mtx0^._m33) !*!
-                                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (-ypr0^._x)) -- pitch
-                                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (-ypr0^._y)) -- yaw
-                                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (-ypr0^._z)) -- roll
+                                                        fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (-ypr0^._x)) -- pitch
+                                                    !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-ypr0^._y)) -- yaw
+                                                    !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (-ypr0^._z)) -- roll
                                                   tr  = --V3 0 0 0 
                                                     mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
 
