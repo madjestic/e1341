@@ -7,19 +7,19 @@
 		{
 			"bufferView":0,
 			"componentType":5123,
-			"count":2616,
+			"count":2634,
 			"type":"SCALAR",
 			"min":[0
 			],
-			"max":[833
+			"max":[838
 			]
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":834,
+			"count":839,
 			"type":"VEC3",
-			"min":[-1.25,-0.56464535,-1.5
+			"min":[-1.25,-0.56464535,-2.66771913
 			],
 			"max":[1.25,0.871287942,1.61341751
 			]
@@ -27,7 +27,7 @@
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":834,
+			"count":839,
 			"type":"VEC4",
 			"min":[1,1,1,1
 			],
@@ -37,7 +37,7 @@
 		{
 			"bufferView":3,
 			"componentType":5126,
-			"count":834,
+			"count":839,
 			"type":"VEC3",
 			"min":[-1,-1,-1
 			],
@@ -47,7 +47,7 @@
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":834,
+			"count":839,
 			"type":"VEC2",
 			"min":[0,0
 			],
@@ -57,7 +57,7 @@
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":834,
+			"count":839,
 			"type":"SCALAR",
 			"min":[4.3210001
 			],
@@ -68,44 +68,44 @@
 	"buffers":[
 		{
 			"uri":"adder_mk1_data.bin",
-			"byteLength":48600,
+			"byteLength":48896,
 			"name":"main_buffer"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":5232,
+			"byteLength":5268,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteOffset":5232,
-			"byteLength":10008,
+			"byteOffset":5268,
+			"byteLength":10068,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":15240,
-			"byteLength":13344,
+			"byteOffset":15336,
+			"byteLength":13424,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":28584,
-			"byteLength":10008,
+			"byteOffset":28760,
+			"byteLength":10068,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":38592,
-			"byteLength":6672,
+			"byteOffset":38828,
+			"byteLength":6712,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":45264,
-			"byteLength":3336,
+			"byteOffset":45540,
+			"byteLength":3356,
 			"target":34962
 		}
 	],

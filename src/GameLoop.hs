@@ -28,6 +28,7 @@ import Control.Concurrent
 import Control.Concurrent.MVar
 
 import Debug.Trace as DT
+import Codec.Picture.Metadata (Value(Double))
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
@@ -69,24 +70,36 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                    , cams = updateEntity <$> cams g0 }
                 where
                   updateEntity :: Entity -> Entity
-                  updateEntity e0 = -- DT.trace ("e0 :" ++ show e0) $
-                    e0{ cmps = updateComponent <$> cmps e0}
+                  updateEntity t0 = -- DT.trace ("t0 :" ++ show t0) $
+                    t0{ cmps = updateComponent <$> cmps t0}
                     where
                       updateComponent cmp =
                           case cmp of
-                            Transformable{}   -> solveTransformable e0 cmp
-                            s@Selectable{}    -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ e0)^.translation) 0.1}
+                            Transformable{}   -> solveTransformable t0 cmp
+                            s@Selectable{}    -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ t0)^.translation) 0.1}
                             _ -> cmp
 
                   solveTransformable :: Entity -> Component -> Component
                   solveTransformable t0 tr0@(Transformable {}) =
                     tr0 { xform  = case isControllerParented t0 of 
-                            False -> foldl (flip (!*!)) (xform tr0) $ xformSolver (xform tr0) <$> tslvrs tr0
-                            True  -> (xformC . xform . transformable . head . filter (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0) -- TODO: derive rotation from ...
+                            False ->
+                              -- DT.trace (
+                              --           "### DEBUG ### : " ++ show (lable t0) ++ "\n" ++
+                              --           "\t" ++ "lable : " ++ show (xform tr0) ++ "\n" ++
+                              --           "\t" ++ "xform : " ++ show (xform tr0) ++ "\n" ++
+                              --           "\t" ++ "xformSolver (xform tr0) <$> tslvrs tr0 : \n" ++ show (xformSolver (xform tr0) <$> tslvrs tr0) ++ "\n"
+                              --          ) $
+                              foldl (flip (!*!)) (xform tr0) $ xformSolver (xform tr0) <$> tslvrs tr0
+                              --identity :: M44 Double
+                            --True  -> (xformC . xform . transformable . head . filter (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0) -- TODO: derive rotation from ...
+                            True  -> (inv44 (mtx')) & translation .~ ((mtx')^.translation)
+                              where
+                                mtx' = -- inv44
+                                  (xform . transformable . head . filter (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0) -- TODO: derive rotation from ...
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
                       xformC :: M44 Double -> M44 Double
-                      xformC mtx0 = tmtx0 !*! rmtx0
+                      xformC mtx0 = mtx0 !*! tmtx0 !*! inv44 mtx0 -- !*! rmtx0
                         where
                           omtx  = (identity :: M44 Double) -- & translation .~ V3 (3.14) 0 (0)
 
@@ -106,7 +119,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             tr
                             where
                               rot = identity :: M33 Double
-                              tr  = mtx0^.translation + V3 10 0.5 0
+                              tr  = mtx0^.translation + V3 0 0.5 10
 
                       isControllable t0       = case controllables t0 of [] -> False; _ -> True
                       isControllerParented t0 = isControllable t0 && (parent . controllable $ t0) /= nil
@@ -132,7 +145,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (avel^._z)) -- roll
                               tr = cxyz
                    
-                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) ->
+                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) -> 
+                            --DT.trace ("") $
                             flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                                 where
                                   rot = 
@@ -146,24 +160,81 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           Parentable uuid0 ->
                             case uuid0 == nil of
                               True  -> identity :: M44 Double
-                              False -> mtx' & translation .~ V3 0 0 0
+                              False -> mtx'-- & translation .~ V3 0 0 0
                                 where mtx' = xformSolver' (identity :: M44 Double) (controllable . head . filter (\t0' -> uuid t0' == uuid0 ) . controllabless $ g0)
                                         where
                                           xformSolver' :: M44 Double -> Component -> M44 Double
-                                          xformSolver' mtx0 cmp = 
+                                          xformSolver' mtx0' cmp = 
                                             case cmp of
                                               c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) ->
-                                                (!*!) (inv44 $ identity) $ mkTransformationMat rot tr
-                                                    where
-                                                      rot = 
-                                                            (mtx0^._m33) !*!
-                                                                fromQuaternion (axisAngle (mtx0^.(_m33._x)) (ypr0^._x)) -- pitch
-                                                            !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
-                                                            !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
-                                                      tr  = 
-                                                            mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+                                                --(!*!) (inv44 $ identity) $ mkTransformationMat rot tr
+                                                flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
+                                                where
+                                                  mtx0'' = identity :: M44 Double
+                                                  rot = 
+                                                    (mtx0^._m33) !*!
+                                                        fromQuaternion (axisAngle (mtx0^.(_m33._x)) (-ypr0^._x)) -- pitch
+                                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (-ypr0^._y)) -- yaw
+                                                    !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (-ypr0^._z)) -- roll
+                                                  tr  = --V3 0 0 0 
+                                                    mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+
+                                                    -- where
+                                                    --   rot = 
+                                                    --         (mtx0'^._m33) !*!
+                                                    --             fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (ypr0^._x)) -- pitch
+                                                    --         !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (ypr0^._y)) -- yaw
+                                                    --         !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (ypr0^._z)) -- roll
+                                                    --   tr  = 
+                                                    --         mtx0'^.translation + inv33 (mtx0'^._m33) !* cvel0
                                                  
                                               _ -> (identity :: M44 Double)                                                
+                          _ -> identity
+
+                                -- DT.trace (
+                                --           "\t" ++ "Parentable mtx' : \n" ++ show (mtx') ++ "\n"
+                                --          ) $
+                                -- mtx' & translation .~ V3 0 0 0
+                                -- where mtx' = xformSolver' (identity :: M44 Double) (controllable . head . filter (\t0' -> uuid t0' == uuid0 ) . controllabless $ g0)
+                                --         where
+                                --           xformSolver' :: M44 Double -> Component -> M44 Double
+                                --           xformSolver' mtx0' cmp = 
+                                --             case cmp of
+                                --               c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) -> 
+                                --                 mtx0 !*! mkTransformationMat rot tr !*! inv44 mtx0
+                                --                 --mtx0 !*! ((identity :: M44 Double) & translation .~ tr) !*! inv44 mtx0
+                                --                     where
+                                --                       rot = --identity :: M33 Double -- !*!
+                                --                             --(mtx0^._m33) !*!
+                                --                                  fromQuaternion (axisAngle (mtx0^.(_m33._z)) (-ypr0^._x))   -- pitch
+                                --                             -- !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (-ypr0^._y)) -- yaw
+                                --                             -- !*! fromQuaternion (axisAngle ((xformS :: M44 Double)^.(_m33._z)) (0*ypr0^._z)) -- roll
+                                --                       tr  = V3 0 0 0
+                                --                             -- mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+
+                                --                       --xformS :: M44 Double -> M44 Double
+                                --                   --     xformS = rmtx0
+                                --                   --       where
+                                --                   -- --         omtx  = (identity :: M44 Double) -- & translation .~ V3 (3.14) 0 (0)
+                                --                   --         rmtx0 =
+                                --                   --           mkTransformationMat
+                                --                   --           rot
+                                --                   --           tr
+                                --                   --           where
+                                --                   --             rot = --(identity :: M44 Double)^._m33 !*!
+                                --                   --                   fromQuaternion (axisAngle ((identity :: M44 Double)^.(_m33._x)) (0))     -- pitch
+                                --                   --               !*! fromQuaternion (axisAngle ((identity :: M44 Double)^.(_m33._y)) (pi/2)) -- yaw
+                                --                   --               !*! fromQuaternion (axisAngle ((identity :: M44 Double)^.(_m33._z)) (0))     -- roll
+                                --                   --             tr = V3 0 0 0
+                                --                   --         tmtx0 =
+                                --                   --           mkTransformationMat
+                                --                   --           rot  
+                                --                   --           tr
+                                --                   --           where
+                                --                   --             rot = identity :: M33 Double
+                                --                   --             tr  = mtx0^.translation + V3 0 0 0
+                                                                                 
+                                --               _ -> (identity :: M44 Double)                                                
                           _ -> identity
 
                       (<++>) :: Component -> Component -> Component
@@ -273,8 +344,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                                             }
                                   where
                                     updateEntity :: Entity -> Entity
-                                    updateEntity e0 =
-                                      e0 { cmps = updateTransformable pos <$> cmps e0 }
+                                    updateEntity t0 =
+                                      t0 { cmps = updateTransformable pos <$> cmps t0 }
                                       where
                                         updateTransformable :: Point V2 CInt -> Component -> Component
                                         updateTransformable pos t0@(Transformable _ slvrs0) = t0 { tslvrs = updateControllable <$> tslvrs t0 }
@@ -428,7 +499,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                   tr0 { tslvrs = updateController t0 (V3 0 0 0) (V3 0 0 (fromIntegral (-n*50))) <$> tslvrs tr0}
                                 updateComponent cmp = cmp
                     
-                    ctrlParent _ = do
+                    ctrlParent _ = do 
+                      liftIO $ putStrLn "ctrlParent"
                       modify parentEntity
                       where
                         parentEntity :: Game -> Game
@@ -459,7 +531,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                          }
                                   | isControllable t0 && isControllableParented  t0 = 
                                       tr { xform  = xform . transformable . head . controllabless $ g0
-                                         , tslvrs = updateComponent <$> (tslvrs . transformable $ t0)
+                                         --, tslvrs = updateComponent <$> (tslvrs . transformable $ t0)
+                                         , tslvrs = updateComponent <$> (tslvrs . transformable . head . controllabless $ g0)
                                          }
                                   | isParentable t0 = 
                                       tr { xform  = xform tr
