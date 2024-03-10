@@ -48,6 +48,7 @@ initProject resx' resy' =
     , "models/adder_mk1.gltf"
     , "models/planet.gltf"
     , "models/stars.gltf"
+    , "models/star.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -93,6 +94,36 @@ initProject resx' resy' =
                   , acc  = V3 0 0 0 }
                 ] :: [Component]
               } 
+            ]
+          }
+        ]
+      , schildren = []
+      , sparent   = nil
+      }
+    , Schema
+      {
+        slable = "star"
+      , suuid  = nil
+      , scmps  =
+        [ Renderable
+          { modelIDXs = [5]
+          , drws      = []
+          , active    = False
+          , backend   = defaultBackendOptions
+          }
+        , Selectable { selected = False }
+        , Transformable
+          { xform =  
+            (V4
+             (V4 1 0 0 0)   -- <- . . . x ...
+             (V4 0 1 0 0)   -- <- . . . y ...
+             (V4 0 0 1 0)   -- <- . . . z-component of transform
+             (V4 0 0 0 1))
+          , tslvrs =
+            [ Identity
+            -- , Attractable
+            --   { mass = 1000000000.0
+            --   , acc  = V3 0 0 0 }
             ]
           }
         ]

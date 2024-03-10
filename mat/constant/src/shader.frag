@@ -1,20 +1,14 @@
-#version 430
+#version 450
 
-uniform float     u_time;
-uniform vec2      u_resolution;
-uniform sampler2D tex_00;
-
-in vec4 gl_FragCoord;
-in float A;
-in vec3  N;
-in vec3  Ng;
-in vec3  Cd;
-in vec3  uv;
-
+in  vec4 rgba;
+in  vec2 fragCoord;
 out vec4 fragColor;
+
+uniform float u_time;
 
 void main()
 {
-	fragColor = vec4( Cd.x, Cd.y, Cd.z, A );
-	//fragColor = vec4( 1.0f, 0.0f, 0.0f, 1.0f );
+  vec4 Cd = rgba;
+  fragColor = vec4( Cd.x, Cd.y, Cd.z, Cd.a );
+  //fragColor = vec4( 1.0f, 0.0f, 0.0f, Cd.a );
 }
