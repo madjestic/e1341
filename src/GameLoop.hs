@@ -87,7 +87,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             True  -> inv44 mtx' & translation .~ (mtx'^.translation)
                               where
                                 mtx' =
-                                  (xformC . xform . transformable . head . filter (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0) -- TODO: derive rotation from ...
+                                  (xformC . xform . transformable . head . filter (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0)
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
                       xformC :: M44 Double -> M44 Double
@@ -189,7 +189,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     where
                                       attractables =
                                         ([ x | x@(Attractable {} ) <- tslvrs (transformable obj1') ])
-                                      Attractable m1 _  = if not.null $ attractables then head attractables else Attractable 0 (V3 0 0 0)
+                                      Attractable m1 _  = if not.null $ attractables then head attractables else Attractable 0 (V3 0 0 0) -- TODO: take all attractables into account
                                       p0   = (xform.transformable $ obj0')^.translation
                                       p1   = (xform.transformable $ obj1')^.translation
                                       dir  = p1 ^-^ p0                 :: V3 Double

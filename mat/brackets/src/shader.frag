@@ -9,8 +9,10 @@ uniform sampler2D checkerboard;
 
 void main()
 {
-  vec2 uv       = fragCoord;
+  vec2 uv   = fragCoord;
+  vec4 Cd   = rgba;
   //vec4 font_clr = texture(checkerboard, vec2(uv.x, uv.y));
-  vec4 font_clr = vec4(1,1,1,1);
-  fragColor     = font_clr;
+  fragColor = vec4( Cd.x, Cd.y, Cd.z, Cd.a );
+  //vec4 font_clr = vec4(1,1,1,1);
+  //fragColor     = font_clr;
 }

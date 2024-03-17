@@ -33,6 +33,7 @@ import Graphics.RedViz.Entity as E
 
 import GameLoop
 import Debug.Trace as DT
+import GHC.Base (undefined)
 
 initProject :: Int -> Int -> Project
 initProject resx' resy' =
@@ -285,6 +286,7 @@ main = do
           { active  = True
           , icons   = iobjs'
           , objects = []
+          , format  = undefined
           }
         ]
       }

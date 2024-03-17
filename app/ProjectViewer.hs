@@ -16,6 +16,7 @@ import Lens.Micro.Extras
 import GHC.Float
 import Linear.Metric (normalize)
 import Data.Set as DS ( fromList, toList )
+import Data.Maybe (listToMaybe)
 
 import Graphics.RedViz.Backend
 import Graphics.RedViz.Descriptor
@@ -73,7 +74,7 @@ initProject resx' resy' =
             (V4
              (V4 1 0 0 3.14) -- <- . . . x ...
              (V4 0 1 0 0)    -- <- . . . y ...
-             (V4 0 0 1 0)    -- <- . . . z-component of transform
+             (V4 0 0 1 200)    -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
@@ -86,8 +87,8 @@ initProject resx' resy' =
               --, rxyz = V3 0 (0) 0 -- TODO pre-rotation composes weirdly down the line
               }
             , Movable
-              { space    = WorldSpace  :: CoordSys
-              , tvel     = V3 0 0.014 0    :: V3 Double -- velocity
+              { space    = WorldSpace   :: CoordSys
+              , tvel     = V3 0 0.014 0 :: V3 Double -- velocity
               , kinslv   = [
                   Attractable
                   { mass = 1000.0
@@ -121,9 +122,9 @@ initProject resx' resy' =
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
-            -- , Attractable
-            --   { mass = 1000000000.0
-            --   , acc  = V3 0 0 0 }
+            , Attractable
+              { mass = 100000000000.0
+              , acc  = V3 0 0 0 }
             ]
           }
         ]
@@ -147,13 +148,13 @@ initProject resx' resy' =
             (V4
              (V4 1 0 0 0)   -- <- . . . x ...
              (V4 0 1 0 0)   -- <- . . . y ...
-             (V4 0 0 1 0)   -- <- . . . z-component of transform
+             (V4 0 0 1 200)   -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
             , Attractable
               { mass = 1000000000.0
-              , acc  = V3 0 0 0 }
+              , acc  = V3 0 100 0 }
             ]
           }
         ]
@@ -231,14 +232,14 @@ playCam =
   , suuid  = nil
   , scmps  =
     [ Camerable
-      { apt        = 50.0
-      , foc        = 100.0 }
+      { foc        = 50.0
+      , apt        = 100.0 }
     , Transformable
       { xform =  
         (V4
          (V4 1 0 0 0)    -- <- . . . x ...
          (V4 0 1 0 0)    -- <- . . . y ...
-         (V4 0 0 1 30)   -- <- . . . z-component of transform
+         (V4 0 0 1 230)   -- <- . . . z-component of transform
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
@@ -333,7 +334,10 @@ main = do
       , cams = cams'
       , unis =
           defaultUniforms
-          { u_res = (resX', resY') }
+          { u_res   = (resX', resY')
+          , u_cam_a = case listToMaybe cams' of Nothing -> 50; Just cams' -> apt . head .camerables $ cams'
+          , u_cam_f = case listToMaybe cams' of Nothing -> 50; Just cams' -> foc . head .camerables $ cams'
+          }
       , wgts =
         [ Cursor
           { active = True
@@ -365,6 +369,17 @@ main = do
           { active  = True
           , icons   = iobjs'
           , objects = []
+          , format = Format
+            {
+              alignment = CC
+            , xres      = resX opts
+            , yres      = resY opts
+            , xoffset   = 0.0
+            , yoffset   = 0.0
+            , zoffset   = 0.0
+            , soffset   = 0.0
+            , ssize     = 2.0
+            }
           }
         ]
       }
