@@ -166,18 +166,20 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                           Identity             -> cmp
                           Movable _ vel0 ss   ->
                             cmp { tvel   = tvel (foldl (<++>) cmp (ss ++ (tslvrs.transformable $ t0)))
-                                , kinslv = updateComponent <$> ss}
+                                , kslvrs = updateComponent <$> ss}
                           Turnable _ _ _ rxyz avel0 ss ->
                             cmp { rxyz   = rxyz + avel0
                                 , avel   = avel (foldl (<++>) cmp (ss ++ (tslvrs.transformable $ t0)))
-                                , kinslv  = updateComponent <$> ss }
+                                , kslvrs  = updateComponent <$> ss }
                           Fadable l a inc _ _ ->
                             cmp { age    = min (a + inc) l}
                           Attractable m0 _ -> cmp { acc = gravity * 0.001 }
                             where 
                               gravity :: V3 Double
-                              gravity = 
-                                if not.null $ attractors then foldr (attract t0) (V3 0 0 0) attractors else V3 0 0 0
+                              gravity =
+                                case attractors of
+                                  [] -> V3 0 0 0
+                                  _  -> foldr (attract t0) (V3 0 0 0) attractors 
                                 where
                                   attractors :: [Object]
                                   attractors =
@@ -188,8 +190,13 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     acc0 + acc'
                                     where
                                       attractables =
-                                        ([ x | x@(Attractable {} ) <- tslvrs (transformable obj1') ])
-                                      Attractable m1 _  = if not.null $ attractables then head attractables else Attractable 0 (V3 0 0 0) -- TODO: take all attractables into account
+                                        case movables obj1' of
+                                          [] -> []
+                                          _  -> ([ x | x@(Attractable {} ) <- kslvrs (movable obj1') ])
+                                      Attractable m1 _  = 
+                                        case attractables of
+                                          [] -> Attractable 0 (V3 0 0 0)
+                                          _  -> head attractables
                                       p0   = (xform.transformable $ obj0')^.translation
                                       p1   = (xform.transformable $ obj1')^.translation
                                       dir  = p1 ^-^ p0                 :: V3 Double

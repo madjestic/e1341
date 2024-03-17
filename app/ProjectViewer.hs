@@ -89,7 +89,7 @@ initProject resx' resy' =
             , Movable
               { space    = WorldSpace   :: CoordSys
               , tvel     = V3 0 0.014 0 :: V3 Double -- velocity
-              , kinslv   = [
+              , kslvrs   = [
                   Attractable
                   { mass = 1000.0
                   , acc  = V3 0 0 0 }
@@ -122,9 +122,15 @@ initProject resx' resy' =
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
-            , Attractable
-              { mass = 100000000000.0
-              , acc  = V3 0 0 0 }
+            , Movable
+              { space    = WorldSpace   :: CoordSys
+              , tvel     = V3 0 0 0 :: V3 Double -- velocity
+              , kslvrs   = [
+                  Attractable
+                  { mass = 100000000000.0
+                  , acc  = V3 0 0 0 }
+                ] :: [Component]
+              } 
             ]
           }
         ]
@@ -152,9 +158,15 @@ initProject resx' resy' =
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
-            , Attractable
-              { mass = 1000000000.0
-              , acc  = V3 0 100 0 }
+            , Movable
+              { space    = WorldSpace   :: CoordSys
+              , tvel     = V3 0 0 0 :: V3 Double -- velocity
+              , kslvrs   = [
+                  Attractable
+                  { mass = 1000000000.0
+                  , acc  = V3 0 0 0 }
+                ] :: [Component]
+              } 
             ]
           }
         ]

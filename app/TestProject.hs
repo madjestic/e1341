@@ -77,14 +77,14 @@ initProject resx' resy' =
             , Movable
               { space   = WorldSpace
               , tvel    = V3 0.0 0 0
-              , kinslv  = [] }
+              , kslvrs  = [] }
             , Turnable
               { space   = ObjectSpace
               , rord    = XYZ
               , cxyz    = V3 0 0 0
               , rxyz    = V3 0 0 0
               , avel    = V3 0 0 (0.05)
-              , kinslv =
+              , kslvrs =
                 [ Fadable
                   { life = 1.0
                   , age  = 0.0
@@ -161,7 +161,7 @@ playCam =
       { space  = WorldSpace
       --, txyz   = V3 0 0 20
       , tvel   = V3 0 0 0
-      , kinslv = [] }
+      , kslvrs = [] }
     , defaultCamTransformable
       { tslvrs =
         [ Identity
