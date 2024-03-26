@@ -152,8 +152,8 @@ initProject resx' resy' =
         , Transformable
           { xform =  
             (V4
-             (V4 1 0 0 0)   -- <- . . . x ...
-             (V4 0 1 0 0)   -- <- . . . y ...
+             (V4 1 0 0 0)     -- <- . . . x ...
+             (V4 0 1 0 0)     -- <- . . . y ...
              (V4 0 0 1 200)   -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
@@ -251,7 +251,7 @@ playCam =
         (V4
          (V4 1 0 0 0)    -- <- . . . x ...
          (V4 0 1 0 0)    -- <- . . . y ...
-         (V4 0 0 1 230)   -- <- . . . z-component of transform
+         (V4 0 0 1 230)    -- <- . . . z-component of transform
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
@@ -351,7 +351,8 @@ main = do
           , u_cam_f = case listToMaybe cams' of Nothing -> 50; Just cams' -> foc . head .camerables $ cams'
           }
       , wgts =
-        [ Cursor
+        [
+          Cursor
           { active = True
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
