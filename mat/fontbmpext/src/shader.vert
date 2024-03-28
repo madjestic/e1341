@@ -20,7 +20,7 @@ void main()
     mat4 ( vec4(xform[0])
 	 , vec4(xform[1])
 	 , vec4(xform[2])
-	 , vec4(xform[3].x + camera[3].x,xform[3].y + camera[3].y,-4,1) // <-1.0f
+	 , vec4(xform[3].x + camera[3].x,xform[3].y + camera[3].y,-0.05,1)
 	 );
   
 
