@@ -366,7 +366,7 @@ main = do
             , yoffset   = 0.0
             , zoffset   = 0.0
             , soffset   = 0.0
-            , ssize     = 1.0
+            , ssize     = 1.5
             }
           }
         , InfoField
@@ -399,7 +399,7 @@ main = do
             , yoffset   = 0.0
             , zoffset   = 0.0
             , soffset   = 0.0
-            , ssize     = 2.0
+            , ssize     = 1.0
             }
           }
         ]
