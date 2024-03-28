@@ -16,13 +16,13 @@ out vec2 fragCoord;
 
 void main()
 {
-
   mat4 xformOffset =
-    mat4 ( vec4(1,0,0,0)
-	 , vec4(0,1,0,0)
-	 , vec4(0,0,1,0)
-	 , vec4(xform[3].x + camera[3].x,xform[3].y + camera[3].y,-10,1)
+    mat4 ( vec4(xform[0])
+	 , vec4(xform[1])
+	 , vec4(xform[2])
+	 , vec4(xform[3].x + camera[3].x,xform[3].y + camera[3].y,-4,1) // <-1.0f
 	 );
+  
 
   vec4 position = vec4(vPosition + vec3(0,0,1.0),1.0);	
 

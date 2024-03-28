@@ -251,7 +251,7 @@ playCam =
         (V4
          (V4 1 0 0 0)    -- <- . . . x ...
          (V4 0 1 0 0)    -- <- . . . y ...
-         (V4 0 0 1 230)    -- <- . . . z-component of transform
+         (V4 0 0 1 230)  -- <- . . . z-component of transform //230
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
@@ -358,12 +358,9 @@ main = do
           , cpos   = P (V2 0 0)
           , optionsW = defaultBackendOptions
           }
-        , TextField
+        , InfoField
           { active = True
-          , text   =
-              [" TextField :"
-              ,"lorem ipsum"
-              ," dolor sit amet?.."]
+          , text   = []
           , fonts  = fobjs'
           , format = Format
             {
@@ -374,7 +371,7 @@ main = do
             , yoffset   = 0.0
             , zoffset   = 0.0
             , soffset   = 0.0
-            , ssize     = 0.0
+            , ssize     = 0.5
             }
           , optionsW = defaultBackendOptions
           }

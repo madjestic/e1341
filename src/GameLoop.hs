@@ -1,7 +1,7 @@
 module GameLoop where
 
 import Data.MonadicStreamFunction
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.Monad.Trans.Maybe
@@ -42,14 +42,14 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
     gameLoopStep :: ReaderT Double (StateT Game IO) Bool
     gameLoopStep = do
       TMSF.ask >>= \r ->  liftIO $ delay $ fromIntegral(double2Int $ r * 100)
-      --lift updateGame
-      TMSF.ask >>= \r -> lift $ updateGame r
+      --lift updateState
+      TMSF.ask >>= \r -> lift $ updateState r
 
-    updateGame :: Double -> StateT Game IO Bool
-    updateGame r = do
+    updateState :: Double -> StateT Game IO Bool
+    updateState r = do
       updateEntities
       updateWidgets
-      updateTick r
+      updateGame r
       handleEvents
         where
           updateEntities :: StateT Game IO ()
@@ -477,8 +477,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                         quit' :: Bool -> Game -> Game
                         quit' b' gameLoopDelay' = gameLoopDelay' { quit = b' }
 
-          updateTick :: Double -> StateT Game IO ()
-          updateTick n = modify $ inc'
+          updateGame :: Double -> StateT Game IO ()
+          updateGame n = modify $ inc'
             where
               inc' :: Game -> Game
               inc' g0 = g0
@@ -487,4 +487,5 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                 where
                   incUnis :: Uniforms -> Uniforms
                   incUnis unis0 = 
-                    unis0 { u_time = tick g0 }
+                    unis0 { u_time    = tick g0
+                          , u_cam_vel = (\t0 -> (\(V3 x y z) -> (x,y,z)) $ cvel . controllable $ t0) $ fromMaybe defaultEntity (listToMaybe $ cams g0) } -- get cvel from first camera
