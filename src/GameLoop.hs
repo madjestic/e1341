@@ -65,12 +65,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                   s               = dot ivec camera_lookat > 1.0 - atan (radius / distance centroid camera_position) / pi
 
               gameEntities :: Game -> Game
-              gameEntities g0 = -- DT.trace ("cams g0 : " ++ show (cams g0)) $
+              gameEntities g0 = 
                 g0 { objs = updateEntity <$> objs g0
                    , cams = updateEntity <$> cams g0 }
                 where
                   updateEntity :: Entity -> Entity
-                  updateEntity t0 = -- DT.trace ("t0 :" ++ show t0) $
+                  updateEntity t0 =
                     t0{ cmps = updateComponent <$> cmps t0}
                     where
                       updateComponent cmp =
@@ -103,9 +103,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                         case cmp of
                           Identity -> identity
                           Constant -> mtx0
-                          Movable cs vel0 _ ->
+                          Movable cs vel0  _ ->
                             case cs of
-                              WorldSpace  -> identity & translation .~ vel0
+                              WorldSpace  -> identity & translation .~ vel0 
                               ObjectSpace -> undefined
                           Turnable _ rord cxyz rxyz avel _ ->  -- TODO: add Object/World rotation distinction
                             (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
@@ -120,7 +120,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               tr = cxyz
                    
                           c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 _) -> 
-                            --DT.trace ("") $
                             flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                                 where
                                   rot = 
@@ -129,12 +128,12 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._y)) (ypr0^._y)) -- yaw
                                         !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (ypr0^._z)) -- roll
                                   tr  = 
-                                        mtx0^.translation + inv33 (mtx0^._m33) !* cvel0
+                                    mtx0^.translation + cvel0
                             
                           Parentable uuid0 ->
                             case uuid0 == nil of
                               True  -> identity :: M44 Double
-                              False -> mtx'-- & translation .~ V3 0 0 0
+                              False -> mtx'
                                 where mtx' = xformSolver' (identity :: M44 Double) (controllable . head . filter (\t0' -> uuid t0' == uuid0 ) . controllabless $ g0)
                                         where
                                           xformSolver' :: M44 Double -> Component -> M44 Double
@@ -149,7 +148,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                                     !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-ypr0^._y)) -- yaw
                                                     !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (-ypr0^._z)) -- roll
                                                   tr  =
-                                                    mtx0^.translation + (mtx0^._m33) !* cvel0
+                                                    mtx0^.translation + cvel0
                                                  
                                               _ -> (identity :: M44 Double)                                                
                           _ -> identity
@@ -164,7 +163,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       updateComponent cmp =
                         case cmp of
                           Identity             -> cmp
-                          Movable _ vel0 ss   ->
+                          Movable _ vel0  ss   ->
                             cmp { tvel   = tvel (foldl (<++>) cmp (ss ++ (tslvrs.transformable $ t0)))
                                 , kslvrs = updateComponent <$> ss}
                           Turnable _ _ _ rxyz avel0 ss ->
@@ -284,10 +283,13 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                                 }
                                               Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS _ Dynamic ->
                                                 cmp0
-                                                { cypr  = keyboardRS *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
-                                                , cyprS = cyprS0 + cypr cmp0
+                                                { cypr  = cypr cmp0 + keyboardRS * ang0 *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
+                                                , cyprS = cypr cmp0 + cyprS0
                                                 }
-
+                                                where
+                                                  fr0  = 1
+                                                  m0   = 100
+                                                  ang0 = fr0 / m0
                                               _ -> cmp0
                                         updateTransformable _ cmp = cmp
 
@@ -357,16 +359,23 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                      -> V3 Double
                                      -> Component
                                      -> Component
-                    updateController obj vel0 ypr0 cmp0 = 
+                    updateController t0 vel0 ypr0 cmp0 = 
                         case cmp0 of
-                          Controllable _ _ cyprS _ keyboardRS keyboardTS _ Static ->
-                            cmp0 { cvel  = keyboardTS *^ vel0
+                          Controllable _ _ cyprS0 _ keyboardRS keyboardTS _ Static ->
+                            cmp0 { cvel  = keyboardTS *^ vel0 
                                  , cypr  = keyboardRS *^ ypr0
-                                 , cyprS = keyboardRS *^ ypr0 + cyprS } 
-                          Controllable _ _ cyprS _ keyboardRS keyboardTS _ Dynamic ->
-                            cmp0 { cvel  = cvel cmp0 + keyboardTS *^ vel0
-                                 , cypr  = cypr cmp0 + keyboardRS *^ ypr0
-                                 , cyprS = cypr cmp0 + keyboardRS *^ ypr0 + cyprS } 
+                                 , cyprS = keyboardRS *^ ypr0 + cyprS0 } 
+                          Controllable _ _ cyprS0 _ keyboardRS keyboardTS _ Dynamic ->
+                            cmp0 { cvel  = cvel cmp0 + keyboardTS * acc0 *^ (inv33 (mtx0^._m33) !* vel0 )
+                                 , cypr  = cypr cmp0 + keyboardRS * ang0 *^ ypr0
+                                 , cyprS = cypr cmp0 + cyprS0 } 
+                                 where
+                                   mtx0 = xform . transformable $ t0
+                                   ft0 = 1
+                                   fr0 = 1
+                                   m0  = 100
+                                   acc0 = ft0 / m0
+                                   ang0 = fr0 / m0
                           _ -> cmp0
 
                     ctrlDolly :: Integer -> StateT Game IO ()
@@ -465,7 +474,6 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                          }
                                   | isControllable t0 && isControllableParented  t0 = 
                                       tr { xform  = xform . transformable . head . controllabless $ g0
-                                         --, tslvrs = updateComponent <$> (tslvrs . transformable $ t0)
                                          , tslvrs = updateComponent <$> (tslvrs . transformable . head . controllabless $ g0)
                                          }
                                   | isParentable t0 = 
