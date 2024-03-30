@@ -256,13 +256,14 @@ playCam =
       , tslvrs =
         [ Identity
         , Controllable
-          { cvel   = V3 0 0 0     
-          , cypr   = V3 0 0 0
-          , cyprS  = V3 0 0 0
-          , mouseS = -0.0000025 -- mouse sensitivity
-          , rotS   =  0.0005    -- rotation sensitivity
-          , movS   =  0.1       -- translation sensitivity
-          , parent = nil
+          { cvel    = V3 0 0 0     
+          , cypr    = V3 0 0 0
+          , cyprS   = V3 0 0 0
+          , mouseS  = -0.0000025 -- mouse sensitivity
+          , rotS    =  0.0005    -- rotation sensitivity
+          , movS    =  0.1       -- translation sensitivity
+          , parent  = nil
+          , phsx    = Dynamic
           }
         ]
       }

@@ -119,7 +119,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     !*! fromQuaternion (axisAngle (mtx0^.(_m33._z)) (avel^._z)) -- roll
                               tr = cxyz
                    
-                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) -> 
+                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 _) -> 
                             --DT.trace ("") $
                             flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                                 where
@@ -140,7 +140,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                           xformSolver' :: M44 Double -> Component -> M44 Double
                                           xformSolver' mtx0' cmp = 
                                             case cmp of
-                                              c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 ) ->
+                                              c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 _) ->
                                                 flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
                                                 where
                                                   rot = 
@@ -276,12 +276,18 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                           where
                                             updateControllable :: Component -> Component
                                             updateControllable cmp0 = case cmp0 of
-                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS _ ->
+                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS _ Static ->
                                                 cmp0
                                                 { cvel  = keyboardTS *^ cvel0
                                                 , cypr  = keyboardRS *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
-                                                , cyprS = keyboardRS *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0 + cyprS0
+                                                , cyprS = cyprS0 + cypr cmp0
                                                 }
+                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS _ Dynamic ->
+                                                cmp0
+                                                { cypr  = keyboardRS *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
+                                                , cyprS = cyprS0 + cypr cmp0
+                                                }
+
                                               _ -> cmp0
                                         updateTransformable _ cmp = cmp
 
@@ -353,10 +359,14 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                      -> Component
                     updateController obj vel0 ypr0 cmp0 = 
                         case cmp0 of
-                          ctrl@(Controllable _ _ cyprS _ keyboardRS keyboardTS _) ->
-                            ctrl { cvel  = keyboardTS *^ vel0
+                          Controllable _ _ cyprS _ keyboardRS keyboardTS _ Static ->
+                            cmp0 { cvel  = keyboardTS *^ vel0
                                  , cypr  = keyboardRS *^ ypr0
                                  , cyprS = keyboardRS *^ ypr0 + cyprS } 
+                          Controllable _ _ cyprS _ keyboardRS keyboardTS _ Dynamic ->
+                            cmp0 { cvel  = cvel cmp0 + keyboardTS *^ vel0
+                                 , cypr  = cypr cmp0 + keyboardRS *^ ypr0
+                                 , cyprS = cypr cmp0 + keyboardRS *^ ypr0 + cyprS } 
                           _ -> cmp0
 
                     ctrlDolly :: Integer -> StateT Game IO ()
@@ -438,7 +448,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                               t0 { cmps = updateComponent <$> cmps t0 }
                               where
                                 updateComponent :: Component -> Component
-                                updateComponent c@(Controllable _ _ _ _ _ _ parent0) = 
+                                updateComponent c@(Controllable _ _ _ _ _ _ parent0 _) = 
                                   if parent0 == nil
                                   then c { parent = uuid . head . parentabless $ g0 }
                                   else c { parent = nil }
