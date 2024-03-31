@@ -1,13 +1,14 @@
 module GameLoop where
 
+import Data.List (find)
 import Data.MonadicStreamFunction
 import Data.Maybe (fromMaybe, listToMaybe)
+import Data.UUID (nil, fromText)
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class ( MonadIO(liftIO) )
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.MSF as TMSF
-import Data.UUID (nil, fromText)
 import Foreign.C.Types
 import GHC.Float
 import Lens.Micro
@@ -22,13 +23,11 @@ import Graphics.RedViz.Component as C
 import Graphics.RedViz.Game as G
 import Graphics.RedViz.Uniforms
 import Graphics.RedViz.Widget as W
-import Data.Aeson (Value(Object))
 
 import Control.Concurrent
 import Control.Concurrent.MVar
 
 import Debug.Trace as DT
-import Codec.Picture.Metadata (Value(Double))
 
 gameLoop :: MSF (MaybeT (ReaderT GameSettings (ReaderT Double (StateT Game IO)))) () Bool
 gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
@@ -76,7 +75,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                       updateComponent cmp =
                           case cmp of
                             Transformable{}   -> solveTransformable t0 cmp
-                            s@Selectable{}    -> s {selected = lookedAt (head $ cams g0) ((xform . transformable $ t0)^.translation) 0.1}
+                            s@Selectable{}    -> s {selected = lookedAt cam0 ((xform . transformable $ t0)^.translation) 0.1}
+                              where cam0 = fromMaybe (error "cams is empty") (listToMaybe . cams $ g0)
                             _ -> cmp
 
                   solveTransformable :: Entity -> Component -> Component
@@ -87,7 +87,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             True  -> inv44 mtx' & translation .~ (mtx'^.translation)
                               where
                                 mtx' =
-                                  (xformC . xform . transformable . head . filter (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0)
+                                  xformC . xform . transformable $ fromMaybe defaultEntity parentControllable
+                                   where parentControllable = find (\t0' -> uuid t0' == (parent . controllable $ t0) ) . objs $ g0
                         , tslvrs = updateComponent <$> tslvrs tr0 }
                     where
                       xformC :: M44 Double -> M44 Double
@@ -134,23 +135,25 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                             case uuid0 == nil of
                               True  -> identity :: M44 Double
                               False -> mtx'
-                                where mtx' = xformSolver' (identity :: M44 Double) (controllable . head . filter (\t0' -> uuid t0' == uuid0 ) . controllabless $ g0)
-                                        where
-                                          xformSolver' :: M44 Double -> Component -> M44 Double
-                                          xformSolver' mtx0' cmp = 
-                                            case cmp of
-                                              c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 _) ->
-                                                flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
-                                                where
-                                                  rot = 
-                                                    (mtx0^._m33) !*!
-                                                        fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (-ypr0^._x)) -- pitch
-                                                    !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-ypr0^._y)) -- yaw
-                                                    !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (-ypr0^._z)) -- roll
-                                                  tr  =
-                                                    mtx0^.translation + cvel0
-                                                 
-                                              _ -> (identity :: M44 Double)                                                
+                                where
+                                  mtx' = xformSolver' (identity :: M44 Double) (controllable $ fromMaybe defaultEntity ctl)
+                                    where
+                                      ctl = find (\t0' -> uuid t0' == uuid0 ) . controllabless $ g0
+                                      xformSolver' :: M44 Double -> Component -> M44 Double
+                                      xformSolver' mtx0' cmp = 
+                                        case cmp of
+                                          c0@(Controllable cvel0 ypr0 yprS0 _ _ _ parent0 _) ->
+                                            flip (!*!) (inv44 $ xform tr0) $ mkTransformationMat rot tr
+                                            where
+                                              rot = 
+                                                (mtx0^._m33) !*!
+                                                    fromQuaternion (axisAngle (mtx0'^.(_m33._x)) (-ypr0^._x)) -- pitch
+                                                !*! fromQuaternion (axisAngle (mtx0'^.(_m33._y)) (-ypr0^._y)) -- yaw
+                                                !*! fromQuaternion (axisAngle (mtx0'^.(_m33._z)) (-ypr0^._z)) -- roll
+                                              tr  =
+                                                mtx0^.translation + cvel0
+                                             
+                                          _ -> (identity :: M44 Double)                                                
                           _ -> identity
 
                       (<++>) :: Component -> Component -> Component
@@ -189,13 +192,11 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                     acc0 + acc'
                                     where
                                       attractables =
-                                        case movables obj1' of
-                                          [] -> []
-                                          _  -> ([ x | x@(Attractable {} ) <- kslvrs (movable obj1') ])
-                                      Attractable m1 _  = 
-                                        case attractables of
-                                          [] -> Attractable 0 (V3 0 0 0)
-                                          _  -> head attractables
+                                        case listToMaybe . movables $ obj1' of
+                                          Nothing -> []
+                                          Just movable' -> ([ x | x@(Attractable {} ) <- kslvrs movable' ])
+                                            where movable' = fromMaybe (error "movables is empty")(listToMaybe . movables $ obj1')
+                                      Attractable m1 _  = fromMaybe (Attractable 0 (V3 0 0 0)) (listToMaybe attractables)
                                       p0   = (xform.transformable $ obj0')^.translation
                                       p1   = (xform.transformable $ obj1')^.translation
                                       dir  = p1 ^-^ p0                 :: V3 Double
@@ -459,22 +460,22 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                 updateComponent :: Component -> Component
                                 updateComponent c@(Controllable _ _ _ _ _ _ parent0 _) = 
                                   if parent0 == nil
-                                  then c { parent = uuid . head . parentabless $ g0 }
+                                  then c { parent = uuid (fromMaybe (error "parentabless is empty") (listToMaybe . parentabless $ g0)) }
                                   else c { parent = nil }
 
                                 updateComponent p@(Parentable parent0)     =
                                   if parent0 == nil
-                                  then p { parent = uuid . head . controllabless $ g0 }
+                                  then p { parent = uuid (fromMaybe (error "controllabless is empty") (listToMaybe . controllabless $ g0)) }
                                   else p { parent = nil }
 
                                 updateComponent tr@(Transformable {}) 
                                   | isControllable t0 && (not . isControllableParented $ t0) = 
-                                      tr { xform  = xform . transformable . head . parentabless $ g0
+                                      tr { xform  = xform . transformable $ fromMaybe (error "controlled parentabless is empty") (listToMaybe . parentabless $ g0)
                                          , tslvrs = updateComponent <$> (tslvrs . transformable $ t0)
                                          }
                                   | isControllable t0 && isControllableParented  t0 = 
-                                      tr { xform  = xform . transformable . head . controllabless $ g0
-                                         , tslvrs = updateComponent <$> (tslvrs . transformable . head . controllabless $ g0)
+                                      tr { xform  = xform . transformable $ fromMaybe (error "parented controllabless is empty") (listToMaybe . controllabless $ g0)
+                                         , tslvrs = updateComponent <$> (tslvrs . transformable $ fromMaybe (error "parented controllabless is empty") (listToMaybe . controllabless $ g0))
                                          }
                                   | isParentable t0 = 
                                       tr { xform  = xform tr
