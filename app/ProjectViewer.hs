@@ -46,10 +46,10 @@ initProject resx' resy' =
   , models  =
     [ "models/pighead.gltf"
     , "models/grid.gltf"
-    , "models/adder_mk1.gltf"
-    , "models/planet.gltf"
-    , "models/stars.gltf"
-    , "models/star.gltf"
+    , "models/adder_mk1_orig.gltf"
+    , "models/planet_orig.gltf"
+    , "models/stars_orig.gltf"
+    , "models/star_orig.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -367,7 +367,7 @@ main = do
             , yoffset   = 0.0
             , zoffset   = 0.0
             , soffset   = 0.0
-            , ssize     = 1.5
+            , ssize     = 1.0
             }
           }
         , InfoField

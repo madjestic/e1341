@@ -21,7 +21,7 @@ void main()
     mat4 ( vec4(xform0[0])
 	 , vec4(xform0[1])
 	 , vec4(xform0[2])
-	 , vec4(xform0[3].x,xform0[3].y,-0.02,1)
+	   , vec4(xform0[3].x,xform0[3].y,-0.0125,1) //-0.012
 	 );
 
   vec4 position = vec4(vPosition + vec3(0,0,1.0),1.0);	
