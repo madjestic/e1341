@@ -289,7 +289,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                                 }
                                                 where
                                                   fr0  = 1
-                                                  m0   = 100
+                                                  m0   = 1
                                                   ang0 = fr0 / m0
                                               _ -> cmp0
                                         updateTransformable _ cmp = cmp
@@ -374,7 +374,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                    mtx0 = xform . transformable $ t0
                                    ft0 = 1
                                    fr0 = 1
-                                   m0  = 100
+                                   m0  = 1
                                    acc0 = ft0 / m0
                                    ang0 = fr0 / m0
                           _ -> cmp0

@@ -34,8 +34,8 @@ void main()
   // logarithmic, so that near object (up to a few thousand meters appear
   // in linear space and the rest is logarithmic
   // TODO: move it to shared lib.glsl code	
-  //float x = length(gl_Position.xyz);
-  //gl_Position.z = mix (f1(x, s1), f2(x, s2), mixF(x, far));
+  float x = length(gl_Position.xyz*0.1);
+  gl_Position.z = mix (f1(x, s1), f2(x, s2), mixF(x, far));
    
 
   // The color of each vertex will be interpolated
