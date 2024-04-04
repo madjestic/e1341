@@ -226,8 +226,9 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
           handleEvents :: StateT Game IO Bool
           handleEvents = do
             events <- SDL.pollEvents
+            g0     <- TMSF.get
             updateMouse events
-            updateKeyboard mapKeyEvents events
+            updateKeyboard (mapKeyEvents g0) events
             let result = any isQuit $ fmap eventPayload events :: Bool
             --get >>= (liftIO . print)
             return result
@@ -263,7 +264,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                                             }
                                   where
                                     updateEntity :: Entity -> Entity
-                                    updateEntity t0 =
+                                    updateEntity t0 = 
                                       t0 { cmps = updateTransformable pos <$> cmps t0 }
                                       where
                                         updateTransformable :: Point V2 CInt -> Component -> Component
@@ -271,34 +272,34 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                           where
                                             updateControllable :: Component -> Component
                                             updateControllable cmp0 = case cmp0 of
-                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS parentUUID' Static ->
+                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS parentUUID Static ->
                                                 cmp0
                                                 { cvel  = keyboardTS *^ cvel0
                                                 , cypr  = keyboardRS * ang0 *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
                                                 , cyprS = cyprS0 + cypr cmp0
                                                 }
                                                 where
-                                                  ang0 = case parentUUID' == nil of
+                                                  ang0 = case parentUUID == nil of
                                                     True  -> 1
                                                     False -> ang0' where
-                                                      parent' = fromMaybe (error "parent is empty") (find (\t0' -> uuid t0' == parentUUID' ) . objs $ g0)
+                                                      parent' = fromMaybe (error "parent is empty") (find (\t0' -> uuid t0' == parentUUID ) . objs $ g0)
                                                       fr0'  = fr   . attractable $ parent' -- 1
                                                       m0'   = mass . attractable $ parent' -- 1
                                                       ang0' = fr0' / m0'
 
-                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS parentUUID' Dynamic ->
+                                              Controllable cvel0 cypr0 cyprS0 _ keyboardRS keyboardTS parentUUID Dynamic ->
                                                 cmp0
                                                 { cypr  = cypr cmp0 + keyboardRS * ang0 *^ V3 (fromIntegral $ pos^._y) (fromIntegral $ pos^._x) 0
                                                 , cyprS = cypr cmp0 + cyprS0
                                                 }
                                                 where -- TODO: read parent attractable if camera is parented
-                                                  ang0 = case parentUUID' == nil of
+                                                  ang0 = case parentUUID == nil of
                                                     True  -> ang0' where
                                                       fr0'  = rotS . controllable $ t0 -- 1
                                                       m0'   = mass . measurable   $ t0 -- 1
                                                       ang0' = fr0' / m0'
                                                     False -> ang0' where
-                                                      parent' = fromMaybe (error "parent is empty") (find (\t0' -> uuid t0' == parentUUID' ) . objs $ g0)
+                                                      parent' = fromMaybe (error "parent is empty") (find (\t0' -> uuid t0' == parentUUID ) . objs $ g0)
                                                       fr0'  = fr   . attractable $ parent' -- 1
                                                       m0'   = mass . attractable $ parent' -- 1
                                                       ang0' = fr0' / m0'
@@ -324,8 +325,8 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                           Nothing -> return ()
                                           Just k'  -> k'
                 
-                mapKeyEvents :: [((Scancode, InputMotion, Bool), StateT Game IO ())]
-                mapKeyEvents =
+                mapKeyEvents :: Game -> [((Scancode, InputMotion, Bool), StateT Game IO ())]
+                mapKeyEvents g0 =
                   [ ((ScancodeEscape, Pressed,  False)  , quitE True )
                   , ((ScancodeEscape, Pressed,  True )  , quitE True )
 
@@ -372,26 +373,37 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
                                      -> Component
                                      -> Component
                     updateController t0 vel0 ypr0 cmp0 = 
-                        case cmp0 of
-                          Controllable _ _ cyprS0 _ keyboardRS keyboardTS _ Static ->
-                            cmp0 { cvel  = keyboardTS *^ (inv33 (mtx0^._m33) !* vel0 )
-                                 , cypr  = keyboardRS *^ ypr0
-                                 , cyprS = keyboardRS *^ ypr0 + cyprS0 } 
-                            where
-                              mtx0 = xform . transformable $ t0
-
-                          Controllable _ _ cyprS0 _ keyboardRS keyboardTS _ Dynamic ->
-                            cmp0 { cvel  = cvel cmp0 + keyboardTS * acc0 *^ (inv33 (mtx0^._m33) !* vel0 )
-                                 , cypr  = cypr cmp0 + keyboardRS * ang0 *^ ypr0
-                                 , cyprS = cypr cmp0 + cyprS0 } 
-                            where
-                              mtx0 = xform . transformable $ t0
-                              ft0  = ft   . attractable $ t0 -- 1 -- translation force 
-                              fr0  = fr   . attractable $ t0 -- 1 -- rotation    force
-                              m0   = mass . attractable $ t0 -- 1 -- mass
-                              acc0 = 1 --ft0 / m0 -- TODO : Dynamic is broken, probably mass/accel issue.
-                              ang0 = 1 --fr0 / m0
-                          _ -> cmp0
+                      case cmp0 of
+                        Controllable _ _ cyprS0 _ keyboardRS keyboardTS _ Static ->
+                          cmp0 { cvel  = keyboardTS *^ (inv33 (mtx0^._m33) !* vel0 )
+                               , cypr  = keyboardRS *^ ypr0
+                               , cyprS = keyboardRS *^ ypr0 + cyprS0 } 
+                          where
+                            mtx0 = xform . transformable $ t0
+                                 
+                        Controllable _ _ cyprS0 _ keyboardRS keyboardTS parentUUID Dynamic ->
+                          cmp0 { cvel  = cvel cmp0 + keyboardTS * acc0 *^ (inv33 (mtx0^._m33) !* vel0 )
+                               , cypr  = cypr cmp0 + keyboardRS * ang0 *^ ypr0
+                               , cyprS = cypr cmp0 + cyprS0 } 
+                          where
+                            (acc0, ang0, mtx0) = case parentUUID == nil of
+                              True -> (acc0', ang0', mtx0') where      
+                                mtx0' = xform . transformable $ t0
+                                ft0   = movS  . controllable  $ t0 -- 1 -- translation force 
+                                fr0   = rotS  . controllable  $ t0 -- 1 -- rotation    force
+                                m0    = mass  . measurable    $ t0 -- 1 -- mass
+                                acc0' = ft0 / m0 -- TODO : Dynamic is broken, probably mass/accel issue.
+                                ang0' = fr0 / m0
+                              False -> (acc0', ang0', mtx0') where      
+                                parent' = fromMaybe (error "parent is empty") (find (\t0' -> uuid t0' == parentUUID ) . objs $ g0)
+                                mtx0' = xform . transformable $ t0
+                                ft0   = ft    . attractable   $ parent' -- 1 -- translation force 
+                                fr0   = fr    . attractable   $ parent' -- 1 -- rotation    force
+                                m0    = mass  . attractable   $ parent' -- 1 -- mass
+                                acc0' = 1 --ft0 / m0 -- TODO : Dynamic is broken, probably mass/accel issue.
+                                ang0' = 1 --fr0 / m0
+                                 
+                        _ -> cmp0
 
                     ctrlDolly :: Integer -> StateT Game IO ()
                     ctrlDolly n = modify camDolly'
