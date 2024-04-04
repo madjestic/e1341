@@ -46,10 +46,10 @@ initProject resx' resy' =
   , models  =
     [ "models/pighead.gltf"
     , "models/grid.gltf"
-    , "models/adder_mk1_orig.gltf"
-    , "models/planet_orig.gltf"
-    , "models/stars_orig.gltf"
-    , "models/star_orig.gltf"
+    , "models/adder_mk1.gltf"
+    , "models/planet.gltf"
+    , "models/stars.gltf"
+    , "models/star.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -72,9 +72,9 @@ initProject resx' resy' =
         , Transformable
           { xform =  
             (V4
-             (V4 1 0 0 3.14)   -- <- . . . x ...
-             (V4 0 1 0 0)      -- <- . . . y ...
-             (V4 0 0 1 200)    -- <- . . . z-component of transform
+             (V4 1 0 0 10000003.14) -- <- . . . x ...
+             (V4 0 1 0 0)           -- <- . . . y ...
+             (V4 0 0 1 1000000200)  -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
@@ -83,7 +83,7 @@ initProject resx' resy' =
             , PreTransformable
               { txyz = V3 0 0 0
               , rord = XYZ
-              , rxyz = V3 0 (pi/2) 0
+              , rxyz = V3 0 (pi/2) 0 -- TODO pre-rotation composes weirdly down the line
               }
             , Movable
               { space    = WorldSpace   :: CoordSys
@@ -91,9 +91,7 @@ initProject resx' resy' =
               , kslvrs   = [
                   Attractable
                   { mass = 1000.0
-                  , acc  = V3 0 0 0
-                  , fr   = 100
-                  , ft   = 0 }
+                  , acc  = V3 0 0 0 }
                 ] :: [Component]
               } 
             ]
@@ -155,7 +153,7 @@ initProject resx' resy' =
             (V4
              (V4 1 0 0 0)     -- <- . . . x ...
              (V4 0 1 0 0)     -- <- . . . y ...
-             (V4 0 0 1 200)   -- <- . . . z-component of transform
+             (V4 0 0 1 1000000200)   -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
@@ -247,14 +245,12 @@ playCam =
     [ Camerable
       { foc        = 50.0
       , apt        = 100.0 }
-    , Measurable
-      { mass = 1.0 }
     , Transformable
       { xform =  
         (V4
-         (V4 1 0 0 0)    -- <- . . . x ...
-         (V4 0 1 0 0)    -- <- . . . y ...
-         (V4 0 0 1 230)  -- <- . . . z-component of transform //230
+         (V4 1 0 0 10000003.14) -- <- . . . x ...
+         (V4 0 1 0 0)           -- <- . . . y ...
+         (V4 0 0 1 1000001800)  -- <- . . . z-component of transform //230
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity

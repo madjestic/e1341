@@ -1,7 +1,7 @@
 {
-    "name": "checkerboard",
-    "fragShader": "./mat/checkerboard/src/shader.frag",
-    "vertShader": "./mat/checkerboard/src/shader.vert",
+    "name": "splines",
+    "fragShader": "./mat/splines/src/shader.frag",
+    "vertShader": "./mat/splines/src/shader.vert",
     "geomShader": null,
     "textures": [
         {

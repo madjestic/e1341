@@ -231,6 +231,17 @@ main = do
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
           , optionsW = defaultBackendOptions
+          , format = Format
+            {
+              alignment = CC
+            , xres      = resX opts
+            , yres      = resY opts
+            , xoffset   = 0.0
+            , yoffset   = 0.0
+            , zoffset   = 0.0
+            , soffset   = 0.0
+            , ssize     = 1.0
+            }
           }
         , TextField
           { active = True

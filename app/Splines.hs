@@ -16,7 +16,6 @@ import Lens.Micro.Extras
 import GHC.Float
 import Linear.Metric (normalize)
 import Data.Set as DS ( fromList, toList )
-import Data.Maybe (listToMaybe)
 
 import Graphics.RedViz.Backend
 import Graphics.RedViz.Descriptor
@@ -46,10 +45,7 @@ initProject resx' resy' =
   , models  =
     [ "models/pighead.gltf"
     , "models/grid.gltf"
-    , "models/adder_mk1_orig.gltf"
-    , "models/planet_orig.gltf"
-    , "models/stars_orig.gltf"
-    , "models/star_orig.gltf"
+    , "models/splines_square.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -59,7 +55,7 @@ initProject resx' resy' =
     ]
   , pobjects = 
     [ Schema
-      { slable = "spaceship"
+      { slable = "splines_square"
       , suuid  = nil
       , scmps  = 
         [ Renderable
@@ -67,125 +63,10 @@ initProject resx' resy' =
           , drws      = []
           , active    = False
           , backend   = defaultBackendOptions
-          } 
-        , Selectable { selected = False }
-        , Transformable
-          { xform =  
-            (V4
-             (V4 1 0 0 3.14)   -- <- . . . x ...
-             (V4 0 1 0 0)      -- <- . . . y ...
-             (V4 0 0 1 200)    -- <- . . . z-component of transform
-             (V4 0 0 0 1))
-          , tslvrs =
-            [ Identity
-            , Parentable
-              { parent   = nil }
-            , PreTransformable
-              { txyz = V3 0 0 0
-              , rord = XYZ
-              , rxyz = V3 0 (pi/2) 0
-              }
-            , Movable
-              { space    = WorldSpace   :: CoordSys
-              , tvel     = V3 0 0.014 0 :: V3 Double -- velocity
-              , kslvrs   = [
-                  Attractable
-                  { mass = 1000.0
-                  , acc  = V3 0 0 0
-                  , fr   = 100
-                  , ft   = 0 }
-                ] :: [Component]
-              } 
-            ]
           }
+        , Identity
         ]
       , schildren = []
-      , sparent   = nil
-      }
-    , Schema
-      {
-        slable = "star"
-      , suuid  = nil
-      , scmps  =
-        [ Renderable
-          { modelIDXs = [5]
-          , drws      = []
-          , active    = False
-          , backend   = defaultBackendOptions
-          }
-        , Selectable { selected = False }
-        , Transformable
-          { xform =  
-            (V4
-             (V4 1 0 0 0)   -- <- . . . x ...
-             (V4 0 1 0 0)   -- <- . . . y ...
-             (V4 0 0 1 0)   -- <- . . . z-component of transform
-             (V4 0 0 0 1))
-          , tslvrs =
-            [ Identity
-            , Movable
-              { space    = WorldSpace   :: CoordSys
-              , tvel     = V3 0 0 0 :: V3 Double -- velocity
-              , kslvrs   = [
-                  Attractable
-                  { mass = 100000000000.0
-                  , acc  = V3 0 0 0 }
-                ] :: [Component]
-              } 
-            ]
-          }
-        ]
-      , schildren = []
-      , sparent   = nil
-      }
-    , Schema
-      {
-        slable = "planet"
-      , suuid  = nil
-      , scmps  =
-        [ Renderable
-          { modelIDXs = [3]
-          , drws      = []
-          , active    = False
-          , backend   = defaultBackendOptions
-          }
-        , Selectable { selected = False }
-        , Transformable
-          { xform =  
-            (V4
-             (V4 1 0 0 0)     -- <- . . . x ...
-             (V4 0 1 0 0)     -- <- . . . y ...
-             (V4 0 0 1 200)   -- <- . . . z-component of transform
-             (V4 0 0 0 1))
-          , tslvrs =
-            [ Identity
-            , Movable
-              { space    = WorldSpace   :: CoordSys
-              , tvel     = V3 0 0 0 :: V3 Double -- velocity
-              , kslvrs   = [
-                  Attractable
-                  { mass = 1000000000.0
-                  , acc  = V3 0 0 0 }
-                ] :: [Component]
-              } 
-            ]
-          }
-        ]
-      , schildren = []
-      , sparent   = nil
-      }
-    , Schema
-      { slable = "stars" 
-      , suuid  = nil
-      , scmps  =
-        [ Renderable
-          { modelIDXs = [4]
-          , drws      = []
-          , active    = False
-          , backend   = pointsOpts
-          }
-        ]
-      , schildren = []        
       , sparent   = nil
       }
     ]
@@ -245,28 +126,21 @@ playCam =
   , suuid  = nil
   , scmps  =
     [ Camerable
-      { foc        = 50.0
-      , apt        = 100.0 }
-    , Measurable
-      { mass = 1.0 }
+      { apt        = 50.0
+      , foc        = 100.0 }
     , Transformable
       { xform =  
         (V4
          (V4 1 0 0 0)    -- <- . . . x ...
          (V4 0 1 0 0)    -- <- . . . y ...
-         (V4 0 0 1 230)  -- <- . . . z-component of transform //230
+         (V4 0 0 1 5)    -- <- . . . z-component of transform
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
-        , Controllable
-          { cvel    = V3 0 0 0     
-          , cypr    = V3 0 0 0
-          , cyprS   = V3 0 0 0
-          , mouseS  = -0.0000025 -- mouse sensitivity
-          , rotS    =  0.0005    -- rotation sensitivity
-          , movS    =  0.1       -- translation sensitivity
-          , parent  = nil
-          , phys    = Dynamic
+        , defaultControllable
+          { cvel   = (V3 0 0 0) -- velocity
+          , cypr   = (V3 0 0 0) -- rotation
+          , cyprS  = (V3 0 0 0) -- sum of rotations
           }
         ]
       }
@@ -350,13 +224,9 @@ main = do
       , cams = cams'
       , unis =
           defaultUniforms
-          { u_res   = (resX', resY')
-          , u_cam_a = case listToMaybe cams' of Nothing -> 50; Just cams' -> apt . head .camerables $ cams'
-          , u_cam_f = case listToMaybe cams' of Nothing -> 50; Just cams' -> foc . head .camerables $ cams'
-          }
+          { u_res = (resX', resY') }
       , wgts =
-        [
-          Cursor
+        [ Cursor
           { active = True
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
@@ -373,9 +243,12 @@ main = do
             , ssize     = 1.0
             }
           }
-        , InfoField
+        , TextField
           { active = True
-          , text   = []
+          , text   =
+              [" TextField :"
+              ,"lorem ipsum"
+              ," dolor sit amet?.."]
           , fonts  = fobjs'
           , format = Format
             {
@@ -385,8 +258,8 @@ main = do
             , xoffset   = 0.0
             , yoffset   = 0.0
             , zoffset   = 0.0
-            , soffset   = 0.9
-            , ssize     = 0.8
+            , soffset   = 0.0
+            , ssize     = 0.0
             }
           , optionsW = defaultBackendOptions
           }
@@ -394,17 +267,6 @@ main = do
           { active  = True
           , icons   = iobjs'
           , objects = []
-          , format = Format
-            {
-              alignment = CC
-            , xres      = resX opts
-            , yres      = resY opts
-            , xoffset   = 0.0
-            , yoffset   = 0.0
-            , zoffset   = 0.0
-            , soffset   = 0.0
-            , ssize     = 1.0
-            }
           }
         ]
       }
