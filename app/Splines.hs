@@ -133,15 +133,20 @@ playCam =
         (V4
          (V4 1 0 0 0)    -- <- . . . x ...
          (V4 0 1 0 0)    -- <- . . . y ...
-         (V4 0 0 1 5)    -- <- . . . z-component of transform
+         (V4 0 0 1 6)    -- <- . . . z-component of transform
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
-        , defaultControllable
-          { cvel   = (V3 0 0 0) -- velocity
-          , cypr   = (V3 0 0 0) -- rotation
-          , cyprS  = (V3 0 0 0) -- sum of rotations
-          }
+        , Controllable
+        { cvel   = V3 0 0 0     
+        , cypr   = V3 0 0 0
+        , cyprS  = V3 0 0 0
+        , mouseS = -0.0000025 -- mouse    "sensitivity"
+        , rotS   =  0.0005    -- keyboard "rotation sensitivity"
+        , movS   =  0.05      -- keyboard "translation sensitivity"
+        , parent = nil
+        , phys   = Static
+        }
         ]
       }
     ]
@@ -227,7 +232,7 @@ main = do
           { u_res = (resX', resY') }
       , wgts =
         [ Cursor
-          { active = True
+          { active = False
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
           , optionsW = defaultBackendOptions
@@ -273,7 +278,8 @@ main = do
 
   animate
     window
-    (1.0/60.0 :: Double) -- 60 fps?
+    --(1.0/0.1 :: Double) -- 0.1 fps? Shader Debug
+    (1.0/60 :: Double) -- 60 fps?
     initSettings
     initGame'
     gameLoop
