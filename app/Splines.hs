@@ -46,6 +46,8 @@ initProject resx' resy' =
     [ "models/pighead.gltf"
     , "models/grid.gltf"
     , "models/splines_square.gltf"
+    , "models/splines_squareB.gltf"
+    , "models/splines_squareC.gltf"
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -59,7 +61,7 @@ initProject resx' resy' =
       , suuid  = nil
       , scmps  = 
         [ Renderable
-          { modelIDXs = [2]
+          { modelIDXs = [4]
           , drws      = []
           , active    = False
           , backend   = defaultBackendOptions
