@@ -61,7 +61,7 @@ initProject resx' resy' =
       , suuid  = nil
       , scmps  = 
         [ Renderable
-          { modelIDXs = [4]
+          { modelIDXs = [2]
           , drws      = []
           , active    = False
           , backend   = defaultBackendOptions
@@ -280,7 +280,7 @@ main = do
 
   animate
     window
-    (1.0/0.1 :: Double) -- 0.1 fps? Shader Debug
+    (1.0/1.0 :: Double) -- 0.1 fps? Shader Debug
     --(1.0/60 :: Double) -- 60 fps?
     initSettings
     initGame'

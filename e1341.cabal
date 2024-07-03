@@ -467,7 +467,7 @@ executable Splines
     ghc-options:    -threaded -O2
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
-    cpp-options:    -DDEBUGSHADERS
+    --cpp-options:    -DDEBUGSHADERS
     build-depends:   base ^>=4.16.4.0
                    , aeson
                    , aeson-pretty

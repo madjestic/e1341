@@ -229,6 +229,7 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
             g0     <- TMSF.get
             updateMouse events
             updateKeyboard (mapKeyEvents g0) events
+            -- TODO: updateGameEvents g0 -- add game events:
             let result = any isQuit $ fmap eventPayload events :: Bool
             --get >>= (liftIO . print)
             return result

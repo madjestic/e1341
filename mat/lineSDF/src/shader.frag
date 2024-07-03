@@ -28,14 +28,13 @@ void main()
   vec2 ar = vec2(aspectRatio, 1.0);
   vec2 p  = pxCoord * ar;
 
-  vec2 v1  = ( vec2(0.5,0.5)*ar + 0.0 );
-  vec2 v2  = ( vec2(0.5,0.5)*ar + 0.0 );
-  float th = (0.25);
+  vec2 v1  = ( vec2(0.25 + 0.1*sin(iTime),0.5 + 0.1*cos(iTime))*ar );
+  vec2 v2  = ( vec2(0.75,0.5)*ar );
     
-  float d = 2.0 * udSegment( p, v1, v2 ) - th;
+  float d = udSegment( p, v1, v2 );
     
   vec3 col = vec3(1.0,1.0,1.0);
-  col     *= d;
+  col     *= sin(d*100);
     
   fragColor = vec4(col,1.0);
 }

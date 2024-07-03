@@ -6,48 +6,48 @@
 	"accessors":[
 		{
 			"bufferView":0,
-			"componentType":5121,
-			"count":6,
+			"componentType":5123,
+			"count":144,
 			"type":"SCALAR",
 			"min":[0
 			],
-			"max":[5
+			"max":[53
 			]
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":6,
+			"count":54,
 			"type":"VEC3",
-			"min":[-12.5440006,-7.05600023,0
+			"min":[0,-1,0
 			],
-			"max":[12.5440006,7.05600023,0
+			"max":[0,-1,0
 			]
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":6,
-			"type":"VEC4",
-			"min":[0.641600609,0.510895014,0.205040097,1
+			"count":54,
+			"type":"VEC3",
+			"min":[-266,0,-230.362778
 			],
-			"max":[0.800463796,0.77547431,0.879505873,1
+			"max":[266,0,230.362778
 			]
 		},
 		{
 			"bufferView":3,
 			"componentType":5126,
-			"count":6,
-			"type":"VEC3",
-			"min":[0,0,1
+			"count":54,
+			"type":"VEC4",
+			"min":[0.395000011,0,0,1
 			],
-			"max":[0,0,1
+			"max":[0.395000011,0,0,1
 			]
 		},
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":6,
+			"count":54,
 			"type":"VEC2",
 			"min":[0,0
 			],
@@ -57,7 +57,7 @@
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":6,
+			"count":54,
 			"type":"SCALAR",
 			"min":[4.3210001
 			],
@@ -67,51 +67,51 @@
 	],
 	"buffers":[
 		{
-			"uri":"splines_square_data.bin",
-			"byteLength":320,
+			"uri":"splines_circle_data.bin",
+			"byteLength":3096,
 			"name":"main_buffer"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":6,
+			"byteLength":288,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteOffset":8,
-			"byteLength":72,
+			"byteOffset":288,
+			"byteLength":648,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":80,
-			"byteLength":96,
+			"byteOffset":936,
+			"byteLength":648,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":176,
-			"byteLength":72,
+			"byteOffset":1584,
+			"byteLength":864,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":248,
-			"byteLength":48,
+			"byteOffset":2448,
+			"byteLength":432,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":296,
-			"byteLength":24,
+			"byteOffset":2880,
+			"byteLength":216,
 			"target":34962
 		}
 	],
 	"nodes":[
 		{
-			"name":"splines_square",
+			"name":"orbit1",
 			"mesh":0
 		}
 	],
@@ -122,9 +122,9 @@
 					"attributes":{
 						"_mass":5,
 						"TEXCOORD_0":4,
-						"NORMAL":3,
-						"_RGBA":2,
-						"POSITION":1
+						"_RGBA":3,
+						"POSITION":2,
+						"NORMAL":1
 					},
 					"indices":0,
 					"material":0
@@ -135,7 +135,7 @@
 	],
 	"materials":[
 		{
-			"name":"splines",
+			"name":"uvsplines",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[0.200000003,0.200000003,0.200000003,1
 				],
