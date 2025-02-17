@@ -7,27 +7,27 @@
 		{
 			"bufferView":0,
 			"componentType":5123,
-			"count":2940,
+			"count":1584,
 			"type":"SCALAR",
 			"min":[0
 			],
-			"max":[512
+			"max":[277
 			]
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":513,
+			"count":278,
 			"type":"VEC3",
-			"min":[-4984373,-4978469.5,-5000000
+			"min":[-5000000,-5000000,-5000000
 			],
-			"max":[4984373,4978469.5,5000000
+			"max":[5000000,5000000,5000000
 			]
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":513,
+			"count":278,
 			"type":"VEC4",
 			"min":[1,1,1,1
 			],
@@ -37,27 +37,27 @@
 		{
 			"bufferView":3,
 			"componentType":5126,
-			"count":513,
+			"count":278,
 			"type":"VEC3",
-			"min":[-0.996811271,-0.995803952,-1
+			"min":[-1,-1,-1
 			],
-			"max":[0.996811271,0.995803952,1
+			"max":[1,1,1
 			]
 		},
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":513,
+			"count":278,
 			"type":"VEC2",
-			"min":[0,0.0295503736
+			"min":[0,0
 			],
-			"max":[1.16595721,0.970449686
+			"max":[1.20833325,1
 			]
 		},
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":513,
+			"count":278,
 			"type":"SCALAR",
 			"min":[4.3210001
 			],
@@ -68,50 +68,50 @@
 	"buffers":[
 		{
 			"uri":"planet_data.bin",
-			"byteLength":32556,
+			"byteLength":17624,
 			"name":"main_buffer"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":5880,
+			"byteLength":3168,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteOffset":5880,
-			"byteLength":6156,
+			"byteOffset":3168,
+			"byteLength":3336,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":12036,
-			"byteLength":8208,
+			"byteOffset":6504,
+			"byteLength":4448,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":20244,
-			"byteLength":6156,
+			"byteOffset":10952,
+			"byteLength":3336,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":26400,
-			"byteLength":4104,
+			"byteOffset":14288,
+			"byteLength":2224,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteOffset":30504,
-			"byteLength":2052,
+			"byteOffset":16512,
+			"byteLength":1112,
 			"target":34962
 		}
 	],
 	"nodes":[
 		{
-			"name":"planet",
+			"name":"planet1",
 			"mesh":0
 		}
 	],
@@ -135,7 +135,7 @@
 	],
 	"materials":[
 		{
-			"name":"checkerboard",
+			"name":"checkerboardlog",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[0.200000003,0.200000003,0.200000003,1
 				],

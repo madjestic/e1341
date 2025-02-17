@@ -62,7 +62,7 @@ initProject resx' resy' =
           { modelIDXs = [0,1]
           , drws      = []
           , active    = False
-          , backend   = defaultBackendOptions
+          , backend   = defaultOptions
           }
         , Selectable { selected = False }
         , Transformable
@@ -108,7 +108,7 @@ initProject resx' resy' =
           { modelIDXs = [0..75]
           , drws     = []
           , active   = False
-          , backend  = defaultBackendOptions
+          , backend  = defaultOptions
           }
         ]
       , schildren = []
@@ -124,7 +124,7 @@ initProject resx' resy' =
           { modelIDXs = [0]
           , drws     = []
           , active   = False
-          , backend  = defaultBackendOptions
+          , backend  = defaultOptions
           }
         ]
       , schildren = []
@@ -256,11 +256,23 @@ main = do
           defaultUniforms
           { u_res = (resX', resY') }
       , wgts =
-        [ Cursor
+        [ 
+          Cursor
           { active = True
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
-          , optionsW = defaultBackendOptions
+          , optionsW = defaultOptions
+          , format = Format
+            {
+              alignment = CC
+            , xres      = resX opts
+            , yres      = resY opts
+            , xoffset   = 0.0
+            , yoffset   = 0.0
+            , zoffset   = 0.0
+            , soffset   = 0.0
+            , ssize     = 1.0
+            }
           }
         , TextField
           { active = True
@@ -280,13 +292,23 @@ main = do
             , soffset   = 0.0
             , ssize     = 0.0
             }
-          , optionsW = defaultBackendOptions
+          , optionsW = defaultOptions
           }
         , Selector
           { active  = True
           , icons   = iobjs'
           , objects = []
-          , format  = undefined
+          , format = Format
+            {
+              alignment = CC
+            , xres      = resX opts
+            , yres      = resY opts
+            , xoffset   = 0.0
+            , yoffset   = 0.0
+            , zoffset   = 0.0
+            , soffset   = 0.0
+            , ssize     = 1.0
+            }
           }
         ]
       }

@@ -64,7 +64,7 @@ initProject resx' resy' =
           { modelIDXs = [2]
           , drws      = []
           , active    = False
-          , backend   = defaultBackendOptions
+          , backend   = defaultOptions
           }
         , Identity
         ]
@@ -81,7 +81,7 @@ initProject resx' resy' =
           { modelIDXs = [0..75]
           , drws     = []
           , active   = False
-          , backend  = defaultBackendOptions
+          , backend  = defaultOptions
           }
         ]
       , schildren = []
@@ -97,7 +97,7 @@ initProject resx' resy' =
           { modelIDXs = [0]
           , drws     = []
           , active   = False
-          , backend  = defaultBackendOptions
+          , backend  = defaultOptions
           }
         ]
       , schildren = []
@@ -237,7 +237,7 @@ main = do
           { active = False
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
-          , optionsW = defaultBackendOptions
+          , optionsW = defaultOptions
           , format = Format
             {
               alignment = CC
@@ -268,7 +268,7 @@ main = do
             , soffset   = 0.0
             , ssize     = 0.0
             }
-          , optionsW = defaultBackendOptions
+          , optionsW = defaultOptions
           }
         , Selector
           { active  = True

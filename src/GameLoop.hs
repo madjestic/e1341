@@ -532,10 +532,10 @@ gameLoop = runGame `untilMaybe` gameQuit `catchMaybe` exit
             where
               inc' :: Game -> Game
               inc' g0 = g0
-                { tick = tick g0 + n 
+                { tick = tick g0 + unsafeCoerce n 
                 , unis = incUnis (unis g0) }
                 where
                   incUnis :: Uniforms -> Uniforms
                   incUnis unis0 = 
-                    unis0 { u_time    = tick g0
+                    unis0 { u_time    = fromIntegral $ tick g0
                           , u_cam_vel = (\t0 -> (\(V3 x y z) -> (x,y,z)) $ cvel . controllable $ t0) $ fromMaybe defaultEntity (listToMaybe $ cams g0) } -- get cvel from first camera

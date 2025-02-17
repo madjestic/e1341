@@ -7,6 +7,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.MSF as TMSF
+import Control.Concurrent (MVar, newMVar, swapMVar)
 import Data.MonadicStreamFunction  
 import Data.UUID (nil)
 import Foreign.C.Types  
@@ -339,7 +340,7 @@ playCam =
         (V4
          (V4 1 0 0 0)    -- <- . . . x ...
          (V4 0 1 0 25) -- <- . . . y ...
-         (V4 0 0 1 300)  -- <- . . . z-component of transform //230
+         (V4 0 0 1 30)  -- <- . . . z-component of transform //230
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
@@ -363,16 +364,21 @@ playCam =
 type DTime = Double
 
 animate :: Window
-        -> DTime
+--        -> DTime
         -> GameSettings
         -> Game
         -> MSF (MaybeT (ReaderT GameSettings (ReaderT DTime (StateT Game IO)))) () Bool
         -> IO ()
-animate window dt gs g sf = do
-  reactimateB $ input >>> sfIO >>> output window
+animate window gs g sf = do
+  lastInteraction <- newMVar =<< SDL.time
+  currentTime     <- SDL.time
+  dt              <- (currentTime -) <$> swapMVar lastInteraction currentTime --dtime
+  
+  reactimateB $ input (dt*1000) >>> sfIO >>> output window
+    
   SDL.quit
   where
-    input    = arr (const (dt, (gs, ())))                            :: MSF IO b (DTime, (GameSettings, ()))
+    input dt = arr (const (dt, (gs, ())))                            :: MSF IO b (DTime, (GameSettings, ()))
     sfIO     = runStateS_ (runReaderS (runReaderS (runMaybeS sf))) g :: MSF IO   (DTime, (GameSettings, ())) (Game, Maybe Bool)
     output w = arrM (renderOutput w gs)                              :: MSF IO   (Game, Maybe Bool) Bool
 
@@ -384,12 +390,12 @@ main = do
       ( unsafeCoerce $ resX opts
       , unsafeCoerce $ resY opts ) :: (CInt, CInt)
 
-  initProject' <- setProjectUUID $ initProject (resX opts) (resY opts)
+  scene <- setProjectUUID $ initProject (resX opts) (resY opts)
 
   let
-    models'     = models     initProject' :: [FilePath]
-    fonts'      = fontModels initProject' :: [FilePath]
-    icons'      = iconModels initProject' :: [FilePath]    
+    models'     = models     scene :: [FilePath]
+    fonts'      = fontModels scene :: [FilePath]
+    icons'      = iconModels scene :: [FilePath]    
 
   initializeAll
   window <- openWindow "Mandelbrot + SDL2/OpenGL" (resX', resY')
@@ -415,7 +421,7 @@ main = do
     itxs   = concatMap (\(_,m) -> R.textures m) $ concat idms
     iuuids = fmap T.uuid itxs
     itxord = DS.toList . DS.fromList $ zip iuuids [0..] 
-    prj    = initProject'
+    prj    = scene
         
   putStrLn "Binding Textures..."
   txTuples  <- mapM (bindTexture  txord) txs  :: IO [(Texture, TextureObject)]
@@ -496,7 +502,7 @@ main = do
 
   animate
     window
-    (1.0/60.0)-- 1.0/60.0 ~= 60 fps?
+    --(1.0/60.0)-- 1.0/60.0 ~= 60 fps?
     initSettings
     initGame'
     gameLoop

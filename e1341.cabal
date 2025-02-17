@@ -1,4 +1,4 @@
-cabal-version:      3.6
+cabal-version:      3.0
 name:               e1341
 version:            0.1.0.0
 synopsis:      A space sim game.
@@ -103,8 +103,8 @@ executable ProjectViewer
     ghc-options:    -threaded -O2
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
-    --cpp-options:    -DDEBUGSHADERS
-    build-depends:   base ^>=4.16.4.0
+    --cpp-options:    
+    build-depends:   base ^>=4.18.2.1
                    , aeson
                    , aeson-pretty
                    , array
@@ -119,7 +119,7 @@ executable ProjectViewer
                    , ilist
                    , JuicyPixels
                    , keid-resource-gltf
-                   , keid-core ==0.1.8.0
+                   , keid-core
                    , linear
                    , locators
                    , massiv
@@ -194,8 +194,8 @@ executable SolarSystem
     ghc-options:    -threaded -O2
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
-    --cpp-options:    -DDEBUGSHADERS
-    build-depends:   base ^>=4.16.4.0
+    cpp-options:    -DDEBUGSHADERS
+    build-depends:   base ^>=4.18.2.1
                    , aeson
                    , aeson-pretty
                    , array
@@ -210,12 +210,12 @@ executable SolarSystem
                    , ilist
                    , JuicyPixels
                    , keid-resource-gltf
-                   , keid-core ==0.1.8.0
+                   , keid-core
                    , linear
                    , locators
                    , massiv
                    , OpenGL
-                   , sdl2
+                   , sdl2 >=2.5.5.0
                    , simple-affine-space
                    , sort
                    , text
@@ -286,7 +286,7 @@ executable TestProject
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
     --cpp-options:    -DDEBUGSHADERS
-    build-depends:   base ^>=4.16.4.0
+    build-depends:   base ^>=4.18.2.1
                    , aeson
                    , aeson-pretty
                    , array
@@ -301,7 +301,7 @@ executable TestProject
                    , ilist
                    , JuicyPixels
                    , keid-resource-gltf
-                   , keid-core ==0.1.8.0
+                   , keid-core
                    , linear
                    , locators
                    , massiv
@@ -377,7 +377,7 @@ executable Raymarcher
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
     --cpp-options:    -DDEBUGSHADERS
-    build-depends:   base ^>=4.16.4.0
+    build-depends:   base ^>=4.18.2.1
                    , aeson
                    , aeson-pretty
                    , array
@@ -392,7 +392,7 @@ executable Raymarcher
                    , ilist
                    , JuicyPixels
                    , keid-resource-gltf
-                   , keid-core ==0.1.8.0
+                   , keid-core
                    , linear
                    , locators
                    , massiv
@@ -468,7 +468,7 @@ executable Splines
     --ghc-options:    -O2 -threaded -Wall -Werror -Wcompat -Widentities -Wno-orphans -Wunused-imports -Wunused-binds
     --ghc-options:    -threaded -prof -fexternal-interpreter -fprof-auto -fprof-cafs "-with-rtsopts=-N -p -s -hc -i0.1 -xc"
     --cpp-options:    -DDEBUGSHADERS
-    build-depends:   base ^>=4.16.4.0
+    build-depends:   base ^>=4.18.2.1
                    , aeson
                    , aeson-pretty
                    , array
@@ -483,7 +483,7 @@ executable Splines
                    , ilist
                    , JuicyPixels
                    , keid-resource-gltf
-                   , keid-core ==0.1.8.0
+                   , keid-core
                    , linear
                    , locators
                    , massiv

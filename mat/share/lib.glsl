@@ -4,6 +4,13 @@ float s1  = 1.0f;
 float s2  = 10.0f;
 float far = 2000.0f;
 
+float mixLinLog(in float z, in float bias)
+{
+	float   b    = round(bias);
+	float zlog = 1.0f + log(z - bias) + bias;
+	return (z > bias ? zlog : z);
+}	
+
 float f1 (in float x, in float s)
 {
 	return (-s*log (x));

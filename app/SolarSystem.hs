@@ -1,4 +1,5 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE CPP #-}
 module Main where
 
 import SDL hiding (Texture, normalize)
@@ -28,12 +29,20 @@ import Graphics.RedViz.Rendering
 import Graphics.RedViz.Component as C
 import Graphics.RedViz.Texture as T
 import Graphics.RedViz.Widget
-import Graphics.RedViz.Uniforms
+import Graphics.RedViz.Uniforms hiding (debug)
 
 import Graphics.RedViz.Entity as E
 
 import GameLoop
 import Debug.Trace as DT
+
+debug :: Bool
+#ifdef DEBUGSHADERS
+debug = True
+#else
+debug = False
+#endif
+
 
 initProject :: Int -> Int -> Project
 initProject resx' resy' =
@@ -44,12 +53,14 @@ initProject resx' resy' =
   , resy    = resy'
   , camMode = "AbsoluteLocation"
   , models  =
-    [ "models/pighead.gltf"
-    , "models/grid.gltf"
-    , "models/adder_mk1.gltf"
-    , "models/planet.gltf"
-    , "models/stars.gltf"
-    , "models/star.gltf"
+    [ "models/pighead.gltf"         -- 0 
+    , "models/grid.gltf"            -- 1
+    , "models/adder_mk1_orig.gltf"  -- 2
+    , "models/planet_orig.gltf"     -- 3
+    , "models/stars_orig.gltf"      -- 4
+    , "models/star.gltf"            -- 5
+    , "models/splines_square.gltf"  -- 6
+    , "models/splines_circle.gltf"  -- 7
     ]
   , fontModels = sharedFonts
   , iconModels =
@@ -58,7 +69,22 @@ initProject resx' resy' =
     , "models/brackets.gltf"
     ]
   , pobjects = 
-    [ Schema
+    [ Schema -- stars
+      { slable = "stars" 
+      , suuid  = nil
+      , scmps  =
+        [ Renderable
+          { modelIDXs = [4]
+          , drws      = []
+          , active    = False
+          , backend   = pointsOpts
+          }
+        ]
+      , schildren = []        
+      , sparent   = nil
+      }
+
+      , Schema -- spaceship
       { slable = "spaceship"
       , suuid  = nil
       , scmps  = 
@@ -66,15 +92,15 @@ initProject resx' resy' =
           { modelIDXs = [2]
           , drws      = []
           , active    = False
-          , backend   = defaultBackendOptions
+          , backend   = defaultOptions
           } 
         , Selectable { selected = False }
         , Transformable
           { xform =  
             (V4
-             (V4 1 0 0 10000003.14) -- <- . . . x ...
-             (V4 0 1 0 0)           -- <- . . . y ...
-             (V4 0 0 1 1000000200)  -- <- . . . z-component of transform
+             (V4 1 0 0 3.14)   -- <- . . . x ...
+             (V4 0 1 0 0)      -- <- . . . y ...
+             (V4 0 0 1 200)    -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
@@ -83,7 +109,7 @@ initProject resx' resy' =
             , PreTransformable
               { txyz = V3 0 0 0
               , rord = XYZ
-              , rxyz = V3 0 (pi/2) 0 -- TODO pre-rotation composes weirdly down the line
+              , rxyz = V3 0 (pi/2) 0
               }
             , Movable
               { space    = WorldSpace   :: CoordSys
@@ -91,7 +117,9 @@ initProject resx' resy' =
               , kslvrs   = [
                   Attractable
                   { mass = 1000.0
-                  , acc  = V3 0 0 0 }
+                  , acc  = V3 0 0 0
+                  , fr   = 100
+                  , ft   = 0 }
                 ] :: [Component]
               } 
             ]
@@ -100,7 +128,7 @@ initProject resx' resy' =
       , schildren = []
       , sparent   = nil
       }
-    , Schema
+    , Schema -- star
       {
         slable = "star"
       , suuid  = nil
@@ -109,7 +137,7 @@ initProject resx' resy' =
           { modelIDXs = [5]
           , drws      = []
           , active    = False
-          , backend   = defaultBackendOptions
+          , backend   = defaultOptions
           }
         , Selectable { selected = False }
         , Transformable
@@ -136,7 +164,7 @@ initProject resx' resy' =
       , schildren = []
       , sparent   = nil
       }
-    , Schema
+    , Schema -- planet
       {
         slable = "planet"
       , suuid  = nil
@@ -145,7 +173,7 @@ initProject resx' resy' =
           { modelIDXs = [3]
           , drws      = []
           , active    = False
-          , backend   = defaultBackendOptions
+          , backend   = defaultOptions
           }
         , Selectable { selected = False }
         , Transformable
@@ -153,7 +181,7 @@ initProject resx' resy' =
             (V4
              (V4 1 0 0 0)     -- <- . . . x ...
              (V4 0 1 0 0)     -- <- . . . y ...
-             (V4 0 0 1 1000000200)   -- <- . . . z-component of transform
+             (V4 0 0 1 200)   -- <- . . . z-component of transform
              (V4 0 0 0 1))
           , tslvrs =
             [ Identity
@@ -172,18 +200,77 @@ initProject resx' resy' =
       , schildren = []
       , sparent   = nil
       }
-    , Schema
-      { slable = "stars" 
+    , Schema -- orbit
+      { slable = "orbit"
       , suuid  = nil
-      , scmps  =
+      , scmps  = 
         [ Renderable
-          { modelIDXs = [4]
+          { modelIDXs = [7]
           , drws      = []
           , active    = False
-          , backend   = pointsOpts
+          , backend   = defaultOptions
           }
+        , Transformable
+          { xform =  
+            (V4
+             (V4 1 0 0 0)   -- <- . . . x ...
+             (V4 0 1 0 0)   -- <- . . . y ...
+             (V4 0 0 1 0)   -- <- . . . z-component of transform
+             (V4 0 0 0 1))
+          , tslvrs =
+            [ Identity
+            , PreTransformable
+              { txyz = V3 0 0 0
+              , rord = XYZ
+              --, rxyz = V3 (-pi/2) 0 0
+              , rxyz = V3 (0) 0 0
+              }
+            ]
+          }
+        , Identity
         ]
-      , schildren = []        
+      , schildren = []
+      , sparent   = nil
+      }      
+    , Schema -- splines square
+      { slable = "splines_square"
+      , suuid  = nil
+      , scmps  = 
+        [ Renderable
+          { modelIDXs = [6]
+          , drws      = []
+          , active    = False
+          , backend   = 
+            Options
+            { primitiveMode = Triangles
+            , bgrColor      = Color4 0.5 0.0 0.0 1.0
+            , ptSize        = 1.0
+            , depthMsk      = Enabled
+            --, blendFunc     = (SrcColor, OneMinusSrcAlpha)
+            , blendFunc     = (SrcAlpha, OneMinusSrcAlpha)
+            }
+
+          }
+        , Transformable
+          { xform =  
+            (V4
+             (V4 1 0 0 0)   -- <- . . . x ...
+             (V4 0 1 0 0)   -- <- . . . y ...
+             (V4 0 0 1 200) -- <- . . . z-component of transform
+             (V4 0 0 0 1))
+          , tslvrs =
+            [ Identity
+            , PreTransformable
+              { txyz = V3 0 0 0
+              , rord = XYZ
+              --, rxyz = V3 (-pi/2) 0 0
+              , rxyz = V3 (0) 0 0
+              }
+            ]
+          }
+        , Identity
+        ]
+      , schildren = []
       , sparent   = nil
       }
     ]
@@ -196,7 +283,7 @@ initProject resx' resy' =
           { modelIDXs = [0..75]
           , drws     = []
           , active   = False
-          , backend  = defaultBackendOptions
+          , backend  = defaultOptions
           }
         ]
       , schildren = []
@@ -212,7 +299,7 @@ initProject resx' resy' =
           { modelIDXs = [0]
           , drws     = []
           , active   = False
-          , backend  = defaultBackendOptions
+          , backend  = defaultOptions
           }
         ]
       , schildren = []
@@ -245,12 +332,14 @@ playCam =
     [ Camerable
       { foc        = 50.0
       , apt        = 100.0 }
+    , Measurable
+      { mass = 1.0 }
     , Transformable
       { xform =  
         (V4
-         (V4 1 0 0 10000003.14) -- <- . . . x ...
-         (V4 0 1 0 0)           -- <- . . . y ...
-         (V4 0 0 1 1000001800)  -- <- . . . z-component of transform //230
+         (V4 1 0 0 0)    -- <- . . . x ...
+         (V4 0 1 0 25)   -- <- . . . y ...
+         (V4 0 0 1 300)  -- <- . . . z-component of transform //230
          (V4 0 0 0 1))
       , tslvrs =
         [ Identity
@@ -259,11 +348,11 @@ playCam =
           , cypr    = V3 0 0 0
           , cyprS   = V3 0 0 0
           , mouseS  = -0.0000025 -- mouse sensitivity
-          , rotS    =  0.0005    -- rotation sensitivity
+          , rotS    =  0.005     -- rotation sensitivity
           , movS    =  0.1       -- translation sensitivity
           , parent  = nil
-          , phys    = Dynamic
-          }
+          , phys    = Dynamic}
+        
         ]
       }
     ]
@@ -356,7 +445,7 @@ main = do
           { active = True
           , icons  = iobjs'
           , cpos   = P (V2 0 0)
-          , optionsW = defaultBackendOptions
+          , optionsW = defaultOptions
           , format = Format
             {
               alignment = CC
@@ -384,7 +473,7 @@ main = do
             , soffset   = 0.9
             , ssize     = 0.8
             }
-          , optionsW = defaultBackendOptions
+          , optionsW = defaultOptions
           }
         , Selector
           { active  = True
@@ -407,7 +496,7 @@ main = do
 
   animate
     window
-    (1.0/60.0 :: Double) -- 60 fps?
+    (1.0/60.0)-- 1.0/60.0 ~= 60 fps?
     initSettings
     initGame'
     gameLoop
